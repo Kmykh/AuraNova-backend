@@ -1,0 +1,12 @@
+.git
+.gitignore
+.vscode
+.idea
+*.user
+*.suo
+bin
+obj
+tests
+secrets
+appsettings.*local*.json
+node_modules

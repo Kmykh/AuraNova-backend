@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "hlLpkRpxXzX393lt1DtxrFqkgaGXH7wjmJ+GYQmI0l4=",
+  "Source": "AuraNova.API",
+  "BasePath": "_content/AuraNova.API",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
