@@ -2,17 +2,14 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy solution and project files
-COPY ["AuraNova.sln", "./"]
+# Copy project files
 COPY ["src/AuraNova.Domain/AuraNova.Domain.csproj", "src/AuraNova.Domain/"]
 COPY ["src/AuraNova.Application/AuraNova.Application.csproj", "src/AuraNova.Application/"]
 COPY ["src/AuraNova.Infrastructure/AuraNova.Infrastructure.csproj", "src/AuraNova.Infrastructure/"]
 COPY ["src/AuraNova.API/AuraNova.API.csproj", "src/AuraNova.API/"]
-COPY ["tests/AuraNova.UnitTests/AuraNova.UnitTests.csproj", "tests/AuraNova.UnitTests/"]
-COPY ["tests/AuraNova.IntegrationTests/AuraNova.IntegrationTests.csproj", "tests/AuraNova.IntegrationTests/"]
 
 # Restore dependencies
-RUN dotnet restore
+RUN dotnet restore "src/AuraNova.API/AuraNova.API.csproj"
 
 # Copy all source code
 COPY . .

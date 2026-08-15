@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../build/AuraNova.API.props" />
-</Project>
