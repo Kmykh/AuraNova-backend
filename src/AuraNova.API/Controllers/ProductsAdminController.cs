@@ -117,7 +117,7 @@ namespace AuraNova.API.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Error interno al subir la imagen.", details = ex.Message });
+                return StatusCode(500, new { message = "Error interno al subir la imagen.", details = ex.ToString() });
             }
         }
     }
