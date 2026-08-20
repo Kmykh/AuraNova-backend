@@ -67,6 +67,7 @@ namespace AuraNova.Infrastructure.Audit
                     Id = x.Id,
                     AdminUserId = x.AdminUserId,
                     AdminEmail = x.AdminUser.Email,
+                    AdminName = x.AdminUser.Name,
                     Action = x.Action,
                     EntityType = x.EntityType,
                     EntityId = x.EntityId,
