@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AuraNova.Application.Quotes.DTOs;
 using AuraNova.Application.Quotes.Interfaces;
+using AuraNova.Application.Audit.Interfaces;
+using AuraNova.API.Extensions;
 using AuraNova.Infrastructure.Orders;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -14,10 +16,12 @@ namespace AuraNova.API.Controllers
     public class QuotesAdminController : ControllerBase
     {
         private readonly IQuoteService _quoteService;
+        private readonly IAdminAuditService _auditService;
 
-        public QuotesAdminController(IQuoteService quoteService)
+        public QuotesAdminController(IQuoteService quoteService, IAdminAuditService auditService)
         {
             _quoteService = quoteService;
+            _auditService = auditService;
         }
 
         [HttpGet]
@@ -44,6 +48,9 @@ namespace AuraNova.API.Controllers
             try
             {
                 var result = await _quoteService.UpdateAsync(id, request);
+                
+                await this.LogActionAsync(_auditService, "UpdateQuote", "Quote", id.ToString(), $"Cotización respondida: S/{request.ShippingCost}.");
+                
                 return Ok(result);
             }
             catch (OrderNotFoundException ex)

@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using AuraNova.Application.Products.DTOs;
 using AuraNova.Application.Products.Interfaces;
 using AuraNova.Application.Storage.Interfaces;
+using AuraNova.Application.Audit.Interfaces;
+using AuraNova.API.Extensions;
 
 namespace AuraNova.API.Controllers
 {
@@ -20,11 +22,16 @@ namespace AuraNova.API.Controllers
     {
         private readonly IProductService _productService;
         private readonly IFileStorageService _fileStorageService;
+        private readonly IAdminAuditService _auditService;
 
-        public ProductsAdminController(IProductService productService, IFileStorageService fileStorageService)
+        public ProductsAdminController(
+            IProductService productService, 
+            IFileStorageService fileStorageService,
+            IAdminAuditService auditService)
         {
             _productService = productService;
             _fileStorageService = fileStorageService;
+            _auditService = auditService;
         }
 
         [HttpPost]
@@ -34,6 +41,9 @@ namespace AuraNova.API.Controllers
                 return BadRequest(ModelState);
 
             var product = await _productService.CreateAsync(request);
+            
+            await this.LogActionAsync(_auditService, "Created", "Product", product.Id.ToString(), $"Producto '{product.Name}' creado.");
+            
             return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
         }
 
@@ -64,6 +74,8 @@ namespace AuraNova.API.Controllers
             if (product == null)
                 return NotFound();
 
+            await this.LogActionAsync(_auditService, "Updated", "Product", id.ToString(), $"Producto '{product.Name}' editado.");
+
             return Ok(product);
         }
 
@@ -77,6 +89,8 @@ namespace AuraNova.API.Controllers
             if (!result)
                 return NotFound();
 
+            await this.LogActionAsync(_auditService, "UpdateStock", "Product", id.ToString(), $"Stock actualizado a {request.Stock}.");
+
             return Ok(new { message = "Stock actualizado correctamente." });
         }
 
@@ -86,6 +100,8 @@ namespace AuraNova.API.Controllers
             var result = await _productService.UpdateAvailabilityAsync(id, request.IsAvailable);
             if (!result)
                 return NotFound();
+
+            await this.LogActionAsync(_auditService, "UpdateAvailability", "Product", id.ToString(), $"Disponibilidad cambiada a {(request.IsAvailable ? "Activo" : "Inactivo")}.");
 
             return Ok(new { message = "Disponibilidad actualizada correctamente." });
         }
@@ -111,6 +127,8 @@ namespace AuraNova.API.Controllers
                 // Subir a la carpeta "products" en el bucket
                 var url = await _fileStorageService.UploadAsync(stream, safeFileName, file.ContentType, "products");
                 
+                await this.LogActionAsync(_auditService, "UploadImage", "Product", null, "Imagen subida para producto.");
+
                 return Ok(new { imageUrl = url });
             }
             catch (Exception ex)

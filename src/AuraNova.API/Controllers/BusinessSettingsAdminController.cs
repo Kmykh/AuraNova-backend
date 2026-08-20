@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.RateLimiting;
 using AuraNova.Application.BusinessSettings.DTOs;
 using AuraNova.Application.BusinessSettings.Interfaces;
+using AuraNova.Application.Audit.Interfaces;
+using AuraNova.API.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,10 +20,12 @@ namespace AuraNova.API.Controllers
     public class BusinessSettingsAdminController : ControllerBase
     {
         private readonly IBusinessSettingsService _service;
+        private readonly IAdminAuditService _auditService;
 
-        public BusinessSettingsAdminController(IBusinessSettingsService service)
+        public BusinessSettingsAdminController(IBusinessSettingsService service, IAdminAuditService auditService)
         {
             _service = service;
+            _auditService = auditService;
         }
 
         [HttpGet]
@@ -37,6 +41,9 @@ namespace AuraNova.API.Controllers
             try
             {
                 var result = await _service.UpdateAsync(request);
+                
+                await this.LogActionAsync(_auditService, "UpdateSettings", "BusinessSettings", null, "Configuración del negocio actualizada.");
+                
                 return Ok(result);
             }
             catch (ArgumentException ex)
@@ -65,6 +72,9 @@ namespace AuraNova.API.Controllers
             {
                 using var stream = qr.OpenReadStream();
                 var result = await _service.UploadYapeQrAsync(stream, safeFileName, qr.ContentType);
+                
+                await this.LogActionAsync(_auditService, "UploadYapeQr", "BusinessSettings", null, "QR de Yape actualizado.");
+                
                 return Ok(new { qrImageUrl = result.YapeQrImageUrl });
             }
             catch (ArgumentException ex)
@@ -77,6 +87,9 @@ namespace AuraNova.API.Controllers
         public async Task<IActionResult> RemoveQr()
         {
             await _service.RemoveYapeQrAsync();
+            
+            await this.LogActionAsync(_auditService, "RemoveYapeQr", "BusinessSettings", null, "QR de Yape eliminado.");
+            
             return NoContent();
         }
     }

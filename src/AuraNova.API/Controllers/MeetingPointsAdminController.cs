@@ -3,6 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using AuraNova.Application.MeetingPoints.DTOs;
 using AuraNova.Application.DeliveryZones.DTOs;
 using AuraNova.Application.MeetingPoints.Interfaces;
+using Microsoft.AspNetCore.RateLimiting;
+using AuraNova.Application.Audit.Interfaces;
+using AuraNova.API.Extensions;
 
 namespace AuraNova.API.Controllers
 {
@@ -13,10 +16,12 @@ namespace AuraNova.API.Controllers
     public class MeetingPointsAdminController : ControllerBase
     {
         private readonly IMeetingPointService _service;
+        private readonly IAdminAuditService _auditService;
 
-        public MeetingPointsAdminController(IMeetingPointService service)
+        public MeetingPointsAdminController(IMeetingPointService service, IAdminAuditService auditService)
         {
             _service = service;
+            _auditService = auditService;
         }
 
         [HttpPost]
@@ -26,6 +31,9 @@ namespace AuraNova.API.Controllers
                 return BadRequest(ModelState);
 
             var point = await _service.CreateAsync(request);
+            
+            await this.LogActionAsync(_auditService, "CreateMeetingPoint", "MeetingPoint", point.Id.ToString(), $"Punto de encuentro '{point.Name}' creado.");
+            
             return CreatedAtAction(nameof(GetById), new { id = point.Id }, point);
         }
 
@@ -52,6 +60,9 @@ namespace AuraNova.API.Controllers
 
             var point = await _service.UpdateAsync(id, request);
             if (point == null) return NotFound();
+            
+            await this.LogActionAsync(_auditService, "UpdateMeetingPoint", "MeetingPoint", point.Id.ToString(), $"Punto de encuentro '{point.Name}' editado.");
+            
             return Ok(point);
         }
 
@@ -60,6 +71,9 @@ namespace AuraNova.API.Controllers
         {
             var result = await _service.UpdateAvailabilityAsync(id, request.IsActive);
             if (!result) return NotFound();
+            
+            await this.LogActionAsync(_auditService, "UpdateMeetingPointAvailability", "MeetingPoint", id.ToString(), $"Disponibilidad de punto de encuentro cambiada a {(request.IsActive ? "Activo" : "Inactivo")}.");
+            
             return Ok(new { message = "Disponibilidad actualizada correctamente." });
         }
     }

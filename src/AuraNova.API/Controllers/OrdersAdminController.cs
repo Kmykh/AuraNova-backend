@@ -5,6 +5,8 @@ using AuraNova.Application.AdminOrders.DTOs;
 using AuraNova.Application.AdminOrders.Interfaces;
 using AuraNova.Application.Orders.DTOs;
 using AuraNova.Application.Orders.Interfaces;
+using AuraNova.Application.Audit.Interfaces;
+using AuraNova.API.Extensions;
 using AuraNova.Domain.Enums;
 using AuraNova.Infrastructure.Orders;
 using Microsoft.AspNetCore.Authorization;
@@ -20,11 +22,13 @@ namespace AuraNova.API.Controllers
     {
         private readonly IOrderStatusService _statusService;
         private readonly IAdminOrderQueryService _queryService;
+        private readonly IAdminAuditService _auditService;
 
-        public OrdersAdminController(IOrderStatusService statusService, IAdminOrderQueryService queryService)
+        public OrdersAdminController(IOrderStatusService statusService, IAdminOrderQueryService queryService, IAdminAuditService auditService)
         {
             _statusService = statusService;
             _queryService = queryService;
+            _auditService = auditService;
         }
 
         [HttpGet]
@@ -59,6 +63,9 @@ namespace AuraNova.API.Controllers
             try
             {
                 var result = await _statusService.ChangeStatusAsync(id, newStatus, request.Comment);
+                
+                await this.LogActionAsync(_auditService, "UpdateStatus", "Order", id.ToString(), $"Estado de pedido cambiado a '{newStatus}'.");
+                
                 return Ok(result);
             }
             catch (OrderNotFoundException ex)
