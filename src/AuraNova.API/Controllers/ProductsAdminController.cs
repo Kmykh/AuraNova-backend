@@ -1,7 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
+using System.IO;
+using System.Linq;
+using System;
+using System.Threading.Tasks;
 using AuraNova.Application.Products.DTOs;
 using AuraNova.Application.Products.Interfaces;
+using AuraNova.Application.Storage.Interfaces;
 
 namespace AuraNova.API.Controllers
 {
@@ -12,10 +19,12 @@ namespace AuraNova.API.Controllers
     public class ProductsAdminController : ControllerBase
     {
         private readonly IProductService _productService;
+        private readonly IFileStorageService _fileStorageService;
 
-        public ProductsAdminController(IProductService productService)
+        public ProductsAdminController(IProductService productService, IFileStorageService fileStorageService)
         {
             _productService = productService;
+            _fileStorageService = fileStorageService;
         }
 
         [HttpPost]
@@ -79,6 +88,37 @@ namespace AuraNova.API.Controllers
                 return NotFound();
 
             return Ok(new { message = "Disponibilidad actualizada correctamente." });
+        }
+
+        [HttpPost("upload-image")]
+        [Consumes("multipart/form-data")]
+        public async Task<IActionResult> UploadImage(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "No se ha proporcionado ningún archivo." });
+
+            if (file.Length > 5 * 1024 * 1024)
+                return BadRequest(new { message = "El archivo no debe exceder los 5 MB." });
+
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            string[] allowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
+            if (!allowedExtensions.Contains(ext))
+                return BadRequest(new { message = "Tipo de archivo no permitido. Solo jpg, png y webp." });
+
+            var safeFileName = $"{Guid.NewGuid()}{ext}";
+
+            try
+            {
+                using var stream = file.OpenReadStream();
+                // Subir a la carpeta "products" en el bucket
+                var url = await _fileStorageService.UploadAsync(stream, safeFileName, file.ContentType, "products");
+                
+                return Ok(new { imageUrl = url });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error interno al subir la imagen.", details = ex.Message });
+            }
         }
     }
 }
