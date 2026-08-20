@@ -34,7 +34,7 @@ namespace AuraNova.UnitTests
             var service = new WhatsAppMessageService(mockSettings.Object);
             var message = "Hola, esto es una prueba.";
 
-            var result = await service.GenerateUrlAsync(message);
+            var result = await service.GenerateUrlAsync("999999999", message);
 
             Assert.StartsWith("https://wa.me/51999999999", result);
             Assert.Contains("?text=", result);
@@ -48,7 +48,7 @@ namespace AuraNova.UnitTests
             var service = new WhatsAppMessageService(mockSettings.Object);
             var message = "Mensaje con espacios y símbolos: %&";
 
-            var result = await service.GenerateUrlAsync(message);
+            var result = await service.GenerateUrlAsync("999999999", message);
 
             var textPart = result.Split("?text=")[1];
             Assert.DoesNotContain(" ", textPart);

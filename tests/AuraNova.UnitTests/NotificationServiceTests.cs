@@ -53,7 +53,7 @@ namespace AuraNova.UnitTests
 
             var whatsAppService = new Mock<IWhatsAppMessageService>();
             whatsAppService.Setup(s => s.NormalizePhone(It.IsAny<string>())).Returns("51999999999");
-            whatsAppService.Setup(s => s.GenerateUrlAsync(It.IsAny<string>())).ReturnsAsync("https://wa.me/test");
+            whatsAppService.Setup(s => s.GenerateUrlAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync("https://wa.me/test");
 
             var service = new NotificationService(db, templateService.Object, whatsAppService.Object, new NullLogger<NotificationService>());
 

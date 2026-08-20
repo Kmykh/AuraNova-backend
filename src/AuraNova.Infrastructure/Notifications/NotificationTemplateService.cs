@@ -34,7 +34,7 @@ namespace AuraNova.Infrastructure.Notifications
             if (isQuote)
             {
                 return $"""
-                    Hola {GetName(order)} 🌸
+                    Hola {GetName(order)} \U0001F338
                     
                     Hemos recibido tu pedido {order.OrderCode} con envío a nivel nacional.
                     
@@ -44,12 +44,12 @@ namespace AuraNova.Infrastructure.Notifications
                     
                     {tracking}
                     
-                    Gracias por elegir {businessName} 💕
+                    Gracias por elegir {businessName} \U0001F495
                     """.Replace("                    ", "");
             }
 
             return $"""
-                Hola {GetName(order)} 🌸
+                Hola {GetName(order)} \U0001F338
                 
                 ¡Tu pedido {order.OrderCode} ha sido registrado!
                 
@@ -59,7 +59,7 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 {tracking}
                 
-                Gracias por elegir {businessName} 💕
+                Gracias por elegir {businessName} \U0001F495
                 """.Replace("                ", "");
         }
 
@@ -72,7 +72,7 @@ namespace AuraNova.Infrastructure.Notifications
             var tracking = await GetTrackingAsync(order);
 
             return $"""
-                Hola {GetName(order)} 🌸
+                Hola {GetName(order)} \U0001F338
                 
                 Tu cotización de {businessName} para el pedido {order.OrderCode} ya está lista.
                 
@@ -84,7 +84,7 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 {tracking}
                 
-                Gracias por elegir {businessName} 💕
+                Gracias por elegir {businessName} \U0001F495
                 """.Replace("                ", "");
         }
 
@@ -92,7 +92,7 @@ namespace AuraNova.Infrastructure.Notifications
         {
             var tracking = await GetTrackingAsync(order);
             return $"""
-                Hola {GetName(order)} 🌸
+                Hola {GetName(order)} \U0001F338
                 
                 Recibimos la evidencia de pago de tu pedido {order.OrderCode}.
                 
@@ -109,9 +109,9 @@ namespace AuraNova.Infrastructure.Notifications
             var businessName = await GetBusinessNameAsync();
             var tracking = await GetTrackingAsync(order);
             return $"""
-                Hola {GetName(order)} 🌸
+                Hola {GetName(order)} \U0001F338
                 
-                Tu pago para el pedido {order.OrderCode} ha sido confirmado ✅
+                Tu pago para el pedido {order.OrderCode} ha sido confirmado \u2705
                 
                 Ahora comenzaremos a preparar tu pedido.
                 
@@ -119,7 +119,7 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 {tracking}
                 
-                Gracias por elegir {businessName} 💕
+                Gracias por elegir {businessName} \U0001F495
                 """.Replace("                ", "");
         }
 
@@ -127,7 +127,7 @@ namespace AuraNova.Infrastructure.Notifications
         {
             var tracking = await GetTrackingAsync(order);
             return $"""
-                Hola {GetName(order)} 🌸
+                Hola {GetName(order)} \U0001F338
                 
                 Necesitamos revisar nuevamente el pago de tu pedido {order.OrderCode}.
                 
@@ -146,7 +146,7 @@ namespace AuraNova.Infrastructure.Notifications
         {
             var tracking = await GetTrackingAsync(order);
             return $"""
-                Hola {GetName(order)} 🌸
+                Hola {GetName(order)} \U0001F338
                 
                 Tu pedido {order.OrderCode} ya está siendo preparado.
                 
@@ -164,7 +164,7 @@ namespace AuraNova.Infrastructure.Notifications
             if (order.DeliveryType == DeliveryType.Delivery)
             {
                 return $"""
-                    Hola {GetName(order)} 🌸
+                    Hola {GetName(order)} \U0001F338
                     
                     Tu pedido {order.OrderCode} ya está listo para ser entregado.
                     
@@ -179,7 +179,7 @@ namespace AuraNova.Infrastructure.Notifications
             }
 
             return $"""
-                Hola {GetName(order)} 🌸
+                Hola {GetName(order)} \U0001F338
                 
                 Tu pedido {order.OrderCode} ya está listo para recoger en el punto de encuentro.
                 
@@ -193,7 +193,7 @@ namespace AuraNova.Infrastructure.Notifications
         {
             var tracking = await GetTrackingAsync(order);
             return $"""
-                Hola {GetName(order)} 🌸
+                Hola {GetName(order)} \U0001F338
                 
                 Tu pedido {order.OrderCode} ya fue enviado.
                 

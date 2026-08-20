@@ -27,10 +27,9 @@ namespace AuraNova.Infrastructure.WhatsApp
             return digits;
         }
 
-        public async Task<string> GenerateUrlAsync(string message)
+        public async Task<string> GenerateUrlAsync(string phone, string message)
         {
-            var settings = await _settingsService.GetPublicAsync();
-            var number = settings.WhatsAppNumber;
+            var number = NormalizePhone(phone);
             if (string.IsNullOrWhiteSpace(number))
                 return string.Empty;
 

@@ -68,7 +68,7 @@ namespace AuraNova.Infrastructure.Notifications
 
                 var normalizedPhone = _whatsAppService.NormalizePhone(phone);
                 var message = await BuildMessageAsync(type, order, reason);
-                var url = await _whatsAppService.GenerateUrlAsync(message);
+                var url = await _whatsAppService.GenerateUrlAsync(phone, message);
 
                 var notification = new Notification
                 {
