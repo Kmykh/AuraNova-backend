@@ -101,9 +101,7 @@ namespace AuraNova.API.Controllers
                 return BadRequest(new { message = "El archivo no debe exceder los 5 MB." });
 
             var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-            string[] allowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
-            if (!allowedExtensions.Contains(ext))
-                return BadRequest(new { message = "Tipo de archivo no permitido. Solo jpg, png y webp." });
+            if (string.IsNullOrEmpty(ext)) ext = ".jpg"; // fallback
 
             var safeFileName = $"{Guid.NewGuid()}{ext}";
 
