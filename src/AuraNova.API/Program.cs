@@ -226,13 +226,19 @@ app.MapHealthChecks("/health");
 
 app.MapControllers();
 
+// Apply migrations automatically
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
+
 // Initial admin bootstrap
 var initialAdmin = builder.Configuration.GetSection("InitialAdmin");
 if (initialAdmin.GetValue<bool>("Enabled"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate(); // Auto-apply migrations on startup
     var hasher = scope.ServiceProvider.GetRequiredService<AuraNova.Application.Auth.Interfaces.IPasswordHasherService>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
