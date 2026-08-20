@@ -30,8 +30,15 @@ namespace AuraNova.API.Controllers
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20)
         {
-            var result = await _auditService.GetAuditLogsAsync(action, entityType, adminUserId, dateFrom, dateTo, page, pageSize);
-            return Ok(result);
+            try
+            {
+                var result = await _auditService.GetAuditLogsAsync(action, entityType, adminUserId, dateFrom, dateTo, page, pageSize);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error interno en auditoría", details = ex.ToString() });
+            }
         }
     }
 }
