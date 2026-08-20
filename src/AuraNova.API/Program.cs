@@ -232,6 +232,7 @@ if (initialAdmin.GetValue<bool>("Enabled"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate(); // Auto-apply migrations on startup
     var hasher = scope.ServiceProvider.GetRequiredService<AuraNova.Application.Auth.Interfaces.IPasswordHasherService>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
