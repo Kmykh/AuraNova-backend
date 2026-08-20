@@ -72,6 +72,9 @@ namespace AuraNova.Infrastructure.Orders
                 if (product.Stock < item.Quantity)
                     throw new OrderValidationException(
                         $"Stock insuficiente para '{product.Name}'. Disponible: {product.Stock}, solicitado: {item.Quantity}.");
+                        
+                // Deduct stock to reserve the items
+                product.Stock -= item.Quantity;
             }
 
             // --- 7. Validate delivery info ---
