@@ -40,9 +40,8 @@ namespace AuraNova.Infrastructure.Notifications
                     
                     En breve calcularemos el costo de envío exacto y te enviaremos la cotización.
                     
-                    Puedes revisar tu pedido aquí:
-                    
-                    {tracking}
+                    Tu código de pedido es: {order.OrderCode}
+                    Tu token de seguridad es: {order.TrackingToken}
                     
                     Gracias por elegir {businessName}
                     """.Replace("                    ", "");
@@ -55,9 +54,10 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Total a pagar: S/ {order.Total:F2}
                 
-                Por favor, realiza el pago mediante Yape y sube la evidencia en el siguiente enlace para que podamos confirmarlo:
+                Por favor, realiza el pago mediante Yape y sube la evidencia en nuestra plataforma para que podamos confirmarlo.
                 
-                {tracking}
+                Tu código de pedido es: {order.OrderCode}
+                Tu token de seguridad es: {order.TrackingToken}
                 
                 Gracias por elegir {businessName}
                 """.Replace("                ", "");
@@ -80,9 +80,8 @@ namespace AuraNova.Infrastructure.Notifications
                 Envío: S/ {shippingCost:F2}
                 Total: S/ {total:F2}
                 
-                Puedes revisar el detalle y aceptar la cotización aquí:
-                
-                {tracking}
+                Tu código de pedido es: {order.OrderCode}
+                Tu token de seguridad es: {order.TrackingToken}
                 
                 Gracias por elegir {businessName}
                 """.Replace("                ", "");
@@ -98,9 +97,8 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Nuestro equipo verificará el pago y te avisaremos cuando haya sido confirmado.
                 
-                Puedes consultar el estado aquí:
-                
-                {tracking}
+                Tu código de pedido es: {order.OrderCode}
+                Tu token de seguridad es: {order.TrackingToken}
                 """.Replace("                ", "");
         }
 
@@ -115,9 +113,8 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Ahora comenzaremos a preparar tu pedido.
                 
-                Puedes consultar su estado aquí:
-                
-                {tracking}
+                Tu código de pedido es: {order.OrderCode}
+                Tu token de seguridad es: {order.TrackingToken}
                 
                 Gracias por elegir {businessName}
                 """.Replace("                ", "");
@@ -136,9 +133,8 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Puedes volver a realizar el proceso de pago y enviar una nueva evidencia.
                 
-                Consulta tu pedido aquí:
-                
-                {tracking}
+                Tu código de pedido es: {order.OrderCode}
+                Tu token de seguridad es: {order.TrackingToken}
                 """.Replace("                ", "");
         }
 
@@ -152,9 +148,8 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Te avisaremos cuando esté listo.
                 
-                Puedes revisar su seguimiento aquí:
-                
-                {tracking}
+                Tu código de pedido es: {order.OrderCode}
+                Tu token de seguridad es: {order.TrackingToken}
                 """.Replace("                ", "");
         }
 
@@ -172,9 +167,8 @@ namespace AuraNova.Infrastructure.Notifications
                     
                     Pronto coordinaremos la entrega contigo.
                     
-                    Seguimiento:
-                    
-                    {tracking}
+                    Tu código de pedido es: {order.OrderCode}
+                    Tu token de seguridad es: {order.TrackingToken}
                     """.Replace("                    ", "");
             }
 
@@ -183,9 +177,8 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Tu pedido {order.OrderCode} ya está listo para recoger en el punto de encuentro.
                 
-                Seguimiento:
-                
-                {tracking}
+                Tu código de pedido es: {order.OrderCode}
+                Tu token de seguridad es: {order.TrackingToken}
                 """.Replace("                ", "");
         }
 
@@ -197,9 +190,8 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Tu pedido {order.OrderCode} ya fue enviado.
                 
-                Puedes consultar su seguimiento aquí:
-                
-                {tracking}
+                Tu código de pedido es: {order.OrderCode}
+                Tu token de seguridad es: {order.TrackingToken}
                 """.Replace("                ", "");
         }
 
@@ -214,9 +206,8 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Gracias por confiar en {businessName}
                 
-                Puedes consultar el historial del pedido aquí:
-                
-                {tracking}
+                Tu código de pedido es: {order.OrderCode}
+                Tu token de seguridad es: {order.TrackingToken}
                 """.Replace("                ", "");
         }
 
