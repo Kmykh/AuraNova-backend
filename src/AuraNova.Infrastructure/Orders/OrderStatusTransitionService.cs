@@ -16,14 +16,25 @@ namespace AuraNova.Infrastructure.Orders
             OrderStatus.Preparing
         ];
 
-        // Forward transitions for Delivery and MeetingPoint (no Shipped)
-        private static readonly Dictionary<OrderStatus, OrderStatus[]> DeliveryTransitions = new()
+        // Forward transitions for MeetingPoint (no Shipped)
+        private static readonly Dictionary<OrderStatus, OrderStatus[]> MeetingPointTransitions = new()
         {
             [OrderStatus.WaitingPayment]   = [OrderStatus.PaymentReported],
             [OrderStatus.PaymentReported]  = [OrderStatus.PaymentConfirmed, OrderStatus.WaitingPayment],
             [OrderStatus.PaymentConfirmed] = [OrderStatus.Preparing],
             [OrderStatus.Preparing]        = [OrderStatus.Ready],
             [OrderStatus.Ready]            = [OrderStatus.Delivered],
+        };
+
+        // Forward transitions for Delivery (includes Shipped)
+        private static readonly Dictionary<OrderStatus, OrderStatus[]> DeliveryTransitions = new()
+        {
+            [OrderStatus.WaitingPayment]   = [OrderStatus.PaymentReported],
+            [OrderStatus.PaymentReported]  = [OrderStatus.PaymentConfirmed, OrderStatus.WaitingPayment],
+            [OrderStatus.PaymentConfirmed] = [OrderStatus.Preparing],
+            [OrderStatus.Preparing]        = [OrderStatus.Ready],
+            [OrderStatus.Ready]            = [OrderStatus.Shipped],
+            [OrderStatus.Shipped]          = [OrderStatus.Delivered],
         };
 
         // Forward transitions for NationalShipping (includes WaitingQuote → QuoteReady and Shipped)
@@ -54,9 +65,12 @@ namespace AuraNova.Infrastructure.Orders
                 return CancellableStates.Contains(current);
 
             // Select transition map
-            var transitions = deliveryType == DeliveryType.NationalShipping
-                ? NationalShippingTransitions
-                : DeliveryTransitions;
+            var transitions = deliveryType switch
+            {
+                DeliveryType.NationalShipping => NationalShippingTransitions,
+                DeliveryType.Delivery => DeliveryTransitions,
+                _ => MeetingPointTransitions
+            };
 
             if (transitions.TryGetValue(current, out var allowedTargets))
                 return allowedTargets.Contains(target);

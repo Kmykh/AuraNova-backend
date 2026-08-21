@@ -29,7 +29,7 @@ namespace AuraNova.Infrastructure.Notifications
             var code = Uri.EscapeDataString(order.OrderCode);
             var token = Uri.EscapeDataString(order.TrackingToken);
 
-            return $"{baseUrl}/{code}/{token}";
+            return $"{baseUrl}?code={code}&token={token}";
         }
     }
 }
