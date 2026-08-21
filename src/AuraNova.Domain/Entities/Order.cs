@@ -56,13 +56,9 @@ namespace AuraNova.Domain.Entities
         /// </summary>
         private static string GenerateTrackingToken()
         {
-            var bytes = new byte[32];
-            RandomNumberGenerator.Fill(bytes);
-            // Base64Url: replace + with -, / with _, remove padding =
-            return Convert.ToBase64String(bytes)
-                .Replace('+', '-')
-                .Replace('/', '_')
-                .TrimEnd('=');
+            // Generates an 8-character token formatted as XXXX-XXXX
+            var token = Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper();
+            return $"{token.Substring(0, 4)}-{token.Substring(4, 4)}";
         }
     }
 }

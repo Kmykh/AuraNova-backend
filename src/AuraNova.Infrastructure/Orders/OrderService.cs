@@ -313,10 +313,9 @@ namespace AuraNova.Infrastructure.Orders
         /// </summary>
         private async Task<string> GenerateOrderCodeAsync()
         {
-            var year = DateTimeOffset.UtcNow.Year;
-            var prefix = $"PED-{year}-";
+            var prefix = "PED-";
 
-            // Find the highest existing order code for this year
+            // Find the highest existing order code for this prefix
             var lastCode = await _db.Orders
                 .Where(o => o.OrderCode.StartsWith(prefix))
                 .OrderByDescending(o => o.OrderCode)
@@ -326,7 +325,7 @@ namespace AuraNova.Infrastructure.Orders
             int nextNumber = 1;
             if (lastCode != null)
             {
-                // Extract the numeric part after "PED-YYYY-"
+                // Extract the numeric part after "PED-"
                 var numericPart = lastCode.Substring(prefix.Length);
                 if (int.TryParse(numericPart, out var lastNumber))
                 {
