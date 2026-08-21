@@ -11,6 +11,10 @@ namespace AuraNova.Infrastructure.Notifications
         private readonly ITrackingUrlService _trackingUrlService;
         private readonly IBusinessSettingsService _settingsService;
 
+        private const string EmojiFlower = "\U0001F338";
+        private const string EmojiHearts = "\U0001F495";
+        private const string EmojiCheck = "\u2705";
+
         public NotificationTemplateService(ITrackingUrlService trackingUrlService, IBusinessSettingsService settingsService)
         {
             _trackingUrlService = trackingUrlService;
@@ -34,7 +38,7 @@ namespace AuraNova.Infrastructure.Notifications
             if (isQuote)
             {
                 return $"""
-                    Hola {GetName(order)} \U0001F338
+                    Hola {GetName(order)} {EmojiFlower}
                     
                     Hemos recibido tu pedido {order.OrderCode} con envío a nivel nacional.
                     
@@ -44,12 +48,12 @@ namespace AuraNova.Infrastructure.Notifications
                     
                     {tracking}
                     
-                    Gracias por elegir {businessName} \U0001F495
+                    Gracias por elegir {businessName} {EmojiHearts}
                     """.Replace("                    ", "");
             }
 
             return $"""
-                Hola {GetName(order)} \U0001F338
+                Hola {GetName(order)} {EmojiFlower}
                 
                 ¡Tu pedido {order.OrderCode} ha sido registrado!
                 
@@ -59,7 +63,7 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 {tracking}
                 
-                Gracias por elegir {businessName} \U0001F495
+                Gracias por elegir {businessName} {EmojiHearts}
                 """.Replace("                ", "");
         }
 
@@ -72,7 +76,7 @@ namespace AuraNova.Infrastructure.Notifications
             var tracking = await GetTrackingAsync(order);
 
             return $"""
-                Hola {GetName(order)} \U0001F338
+                Hola {GetName(order)} {EmojiFlower}
                 
                 Tu cotización de {businessName} para el pedido {order.OrderCode} ya está lista.
                 
@@ -84,7 +88,7 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 {tracking}
                 
-                Gracias por elegir {businessName} \U0001F495
+                Gracias por elegir {businessName} {EmojiHearts}
                 """.Replace("                ", "");
         }
 
@@ -92,7 +96,7 @@ namespace AuraNova.Infrastructure.Notifications
         {
             var tracking = await GetTrackingAsync(order);
             return $"""
-                Hola {GetName(order)} \U0001F338
+                Hola {GetName(order)} {EmojiFlower}
                 
                 Recibimos la evidencia de pago de tu pedido {order.OrderCode}.
                 
@@ -109,9 +113,9 @@ namespace AuraNova.Infrastructure.Notifications
             var businessName = await GetBusinessNameAsync();
             var tracking = await GetTrackingAsync(order);
             return $"""
-                Hola {GetName(order)} \U0001F338
+                Hola {GetName(order)} {EmojiFlower}
                 
-                Tu pago para el pedido {order.OrderCode} ha sido confirmado \u2705
+                Tu pago para el pedido {order.OrderCode} ha sido confirmado {EmojiCheck}
                 
                 Ahora comenzaremos a preparar tu pedido.
                 
@@ -119,7 +123,7 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 {tracking}
                 
-                Gracias por elegir {businessName} \U0001F495
+                Gracias por elegir {businessName} {EmojiHearts}
                 """.Replace("                ", "");
         }
 
@@ -127,7 +131,7 @@ namespace AuraNova.Infrastructure.Notifications
         {
             var tracking = await GetTrackingAsync(order);
             return $"""
-                Hola {GetName(order)} \U0001F338
+                Hola {GetName(order)} {EmojiFlower}
                 
                 Necesitamos revisar nuevamente el pago de tu pedido {order.OrderCode}.
                 
@@ -146,7 +150,7 @@ namespace AuraNova.Infrastructure.Notifications
         {
             var tracking = await GetTrackingAsync(order);
             return $"""
-                Hola {GetName(order)} \U0001F338
+                Hola {GetName(order)} {EmojiFlower}
                 
                 Tu pedido {order.OrderCode} ya está siendo preparado.
                 
@@ -164,7 +168,7 @@ namespace AuraNova.Infrastructure.Notifications
             if (order.DeliveryType == DeliveryType.Delivery)
             {
                 return $"""
-                    Hola {GetName(order)} \U0001F338
+                    Hola {GetName(order)} {EmojiFlower}
                     
                     Tu pedido {order.OrderCode} ya está listo para ser entregado.
                     
@@ -179,7 +183,7 @@ namespace AuraNova.Infrastructure.Notifications
             }
 
             return $"""
-                Hola {GetName(order)} \U0001F338
+                Hola {GetName(order)} {EmojiFlower}
                 
                 Tu pedido {order.OrderCode} ya está listo para recoger en el punto de encuentro.
                 
@@ -193,7 +197,7 @@ namespace AuraNova.Infrastructure.Notifications
         {
             var tracking = await GetTrackingAsync(order);
             return $"""
-                Hola {GetName(order)} \U0001F338
+                Hola {GetName(order)} {EmojiFlower}
                 
                 Tu pedido {order.OrderCode} ya fue enviado.
                 
@@ -208,11 +212,11 @@ namespace AuraNova.Infrastructure.Notifications
             var businessName = await GetBusinessNameAsync();
             var tracking = await GetTrackingAsync(order);
             return $"""
-                Hola {GetName(order)} 🌸
+                Hola {GetName(order)} {EmojiFlower}
                 
-                Tu pedido {order.OrderCode} ha sido marcado como entregado ✅
+                Tu pedido {order.OrderCode} ha sido marcado como entregado {EmojiCheck}
                 
-                Gracias por confiar en {businessName} 💕
+                Gracias por confiar en {businessName} {EmojiHearts}
                 
                 Puedes consultar el historial del pedido aquí:
                 
@@ -224,7 +228,7 @@ namespace AuraNova.Infrastructure.Notifications
         {
             var businessName = await GetBusinessNameAsync();
             return $"""
-                Hola {GetName(order)} 🌸
+                Hola {GetName(order)} {EmojiFlower}
                 
                 Tu pedido {order.OrderCode} ha sido cancelado.
                 
