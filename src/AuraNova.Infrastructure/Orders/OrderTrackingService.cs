@@ -22,6 +22,10 @@ namespace AuraNova.Infrastructure.Orders
         {
             var order = await _db.Orders
                 .Include(o => o.StatusHistory)
+                .Include(o => o.Items)
+                .ThenInclude(i => i.Product)
+                .Include(o => o.DeliveryZone)
+                .Include(o => o.MeetingPoint)
                 .FirstOrDefaultAsync(o => o.OrderCode == orderCode);
 
             if (order == null)
@@ -50,7 +54,21 @@ namespace AuraNova.Infrastructure.Orders
                 StatusLabel = OrderStatusLabels.GetLabel(order.Status),
                 DeliveryType = order.DeliveryType.ToString(),
                 Total = order.Total,
-                Timeline = timeline
+                Timeline = timeline,
+                Items = order.Items.Select(i => new PublicTrackingItemResponse
+                {
+                    ProductName = i.Product?.Name ?? "Producto Desconocido",
+                    Quantity = i.Quantity
+                }).ToList(),
+                Delivery = new PublicTrackingDeliveryResponse
+                {
+                    DeliveryZoneName = order.DeliveryZone?.Name,
+                    MeetingPointName = order.MeetingPoint?.Name,
+                    DeliveryAddress = order.DeliveryAddress,
+                    Department = order.Department,
+                    Province = order.Province,
+                    District = order.District
+                }
             };
         }
     }
