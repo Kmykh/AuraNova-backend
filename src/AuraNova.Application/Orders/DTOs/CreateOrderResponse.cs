@@ -9,6 +9,7 @@ namespace AuraNova.Application.Orders.DTOs
         public decimal? DeliveryCost { get; set; }
         public decimal? Total { get; set; }
         public string Status { get; set; } = null!;
+        public string TrackingToken { get; set; } = null!;
         public DateTimeOffset CreatedAt { get; set; }
         public List<CreateOrderItemResponse> Items { get; set; } = [];
         public CreateOrderDeliveryResponse? Delivery { get; set; }

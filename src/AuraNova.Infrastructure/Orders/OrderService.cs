@@ -270,6 +270,7 @@ namespace AuraNova.Infrastructure.Orders
                     DeliveryCost = order.DeliveryCost,
                     Total = order.Total,
                     Status = order.Status.ToString(),
+                    TrackingToken = order.TrackingToken,
                     CreatedAt = order.CreatedAt,
                     Items = orderItems.Select(oi =>
                     {
