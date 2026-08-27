@@ -41,6 +41,32 @@ namespace AuraNova.API.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        /// <summary>
+        /// Creates a new custom order (100% personalized).
+        /// </summary>
+        [HttpPost("custom")]
+        [EnableRateLimiting("create_order_policy")]
+        public async Task<IActionResult> CreateCustom([FromBody] CreateCustomOrderRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var result = await _orderService.CreateCustomAsync(request);
+                return StatusCode(201, result);
+            }
+            catch (OrderNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (OrderValidationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         [HttpPost("{id}/accept-quote")]
         [EnableRateLimiting("accept_quote_policy")]
         public async Task<IActionResult> AcceptQuote(Guid id)

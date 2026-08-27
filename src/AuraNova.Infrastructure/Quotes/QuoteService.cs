@@ -67,8 +67,12 @@ namespace AuraNova.Infrastructure.Quotes
             if (request.ShippingCost < 0)
                 throw new OrderValidationException("El costo de envío no puede ser negativo.");
 
+            if (request.CustomizationCost < 0)
+                throw new OrderValidationException("El costo de personalización no puede ser negativo.");
+
             // Update Quote
             quote.ShippingCost = request.ShippingCost;
+            quote.CustomizationCost = request.CustomizationCost;
             quote.Notes = request.Notes?.Trim();
             quote.Status = QuoteStatus.Ready;
             quote.QuotedAt = DateTimeOffset.UtcNow;
@@ -76,7 +80,8 @@ namespace AuraNova.Infrastructure.Quotes
 
             // Update Order
             order.DeliveryCost = request.ShippingCost;
-            order.Total = order.Subtotal + request.ShippingCost;
+            order.CustomizationCost = request.CustomizationCost;
+            order.Total = order.Subtotal + request.ShippingCost + request.CustomizationCost;
             order.Status = OrderStatus.QuoteReady;
             order.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -108,6 +113,7 @@ namespace AuraNova.Infrastructure.Quotes
                 OrderId = order.Id,
                 OrderCode = order.OrderCode,
                 ShippingCost = quote.ShippingCost,
+                CustomizationCost = quote.CustomizationCost,
                 Subtotal = order.Subtotal,
                 Total = order.Total,
                 Notes = quote.Notes,

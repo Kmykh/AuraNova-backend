@@ -73,7 +73,9 @@ namespace AuraNova.Infrastructure.Orders
                     Status = o.Status.ToString(),
                     Subtotal = o.Subtotal,
                     DeliveryCost = o.DeliveryCost,
+                    CustomizationCost = o.CustomizationCost,
                     Total = o.Total,
+                    IsCustomOrder = o.IsCustomOrder,
                     CreatedAt = o.CreatedAt,
                     UpdatedAt = o.UpdatedAt
                 }).ToList();
@@ -108,8 +110,12 @@ namespace AuraNova.Infrastructure.Orders
                 UpdatedAt = order.UpdatedAt,
                 Subtotal = order.Subtotal,
                 DeliveryCost = order.DeliveryCost,
+                CustomizationCost = order.CustomizationCost,
                 Total = order.Total,
                 HasPaymentEvidence = order.Payment != null && !string.IsNullOrWhiteSpace(order.Payment.EvidenceUrl),
+                IsCustomOrder = order.IsCustomOrder,
+                ReferenceImageUrl = order.ReferenceImageUrl,
+                CustomizationNotes = order.CustomizationNotes,
                 Customer = new AdminOrderCustomer
                 {
                     Name = order.Customer?.Name ?? string.Empty,
@@ -154,6 +160,7 @@ namespace AuraNova.Infrastructure.Orders
                 {
                     QuoteStatus = order.Quote.Status.ToString(),
                     ShippingCost = order.Quote.ShippingCost ?? 0m,
+                    CustomizationCost = order.Quote.CustomizationCost,
                     Notes = order.Quote.Notes,
                     QuotedAt = order.Quote.QuotedAt
                 };

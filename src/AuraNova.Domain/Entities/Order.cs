@@ -34,6 +34,12 @@ namespace AuraNova.Domain.Entities
         public OrderStatus Status { get; set; }
         public string? Notes { get; set; }
 
+        // Custom Order Fields
+        public bool IsCustomOrder { get; set; } = false;
+        public string? ReferenceImageUrl { get; set; }
+        public string? CustomizationNotes { get; set; }
+        public decimal CustomizationCost { get; set; }
+
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
 

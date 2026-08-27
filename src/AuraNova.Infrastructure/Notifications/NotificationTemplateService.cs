@@ -28,8 +28,25 @@ namespace AuraNova.Infrastructure.Notifications
         public async Task<string> BuildOrderCreatedMessageAsync(Order order)
         {
             var isQuote = order.DeliveryType == DeliveryType.NationalShipping;
+            var isCustom = order.IsCustomOrder;
             var businessName = await GetBusinessNameAsync();
             var tracking = await GetTrackingAsync(order);
+
+            if (isCustom)
+            {
+                return $"""
+                    Hola {GetName(order)}
+                    
+                    Hemos recibido tu solicitud de pedido personalizado ({order.OrderCode}).
+                    
+                    En breve revisaremos tus indicaciones y la imagen de referencia para enviarte la cotización.
+                    
+                    Tu código de pedido es: {order.OrderCode}
+                    Tu token de seguridad es: {order.TrackingToken}
+                    
+                    Gracias por elegir {businessName}
+                    """.Replace("                    ", "");
+            }
 
             if (isQuote)
             {
@@ -66,10 +83,29 @@ namespace AuraNova.Infrastructure.Notifications
         public async Task<string> BuildQuoteReadyMessageAsync(Order order)
         {
             var shippingCost = order.Quote?.ShippingCost ?? 0m;
+            var customCost = order.Quote?.CustomizationCost ?? 0m;
             var subtotal = order.Subtotal;
-            var total = subtotal + shippingCost;
+            var total = subtotal + shippingCost + customCost;
             var businessName = await GetBusinessNameAsync();
             var tracking = await GetTrackingAsync(order);
+
+            if (order.IsCustomOrder)
+            {
+                return $"""
+                    Hola {GetName(order)}
+                    
+                    Tu cotización de {businessName} para tu pedido personalizado ({order.OrderCode}) ya está lista.
+                    
+                    Costo del detalle: S/ {customCost:F2}
+                    Envío: S/ {shippingCost:F2}
+                    Total a pagar: S/ {total:F2}
+                    
+                    Tu código de pedido es: {order.OrderCode}
+                    Tu token de seguridad es: {order.TrackingToken}
+                    
+                    Gracias por elegir {businessName}
+                    """.Replace("                    ", "");
+            }
 
             return $"""
                 Hola {GetName(order)}

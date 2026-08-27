@@ -312,6 +312,155 @@ namespace AuraNova.Infrastructure.Orders
         /// Generates a unique, human-readable order code in format PED-YYYY-NNNNNN.
         /// Uses the max existing sequence number for the current year to avoid gaps/collisions.
         /// </summary>
+
+        public async Task<CreateOrderResponse> CreateCustomAsync(CreateCustomOrderRequest request)
+        {
+            var supportsTransactions = _db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory";
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
+
+            if (supportsTransactions)
+                transaction = await _db.Database.BeginTransactionAsync();
+
+            try
+            {
+                // --- 1. Identify or Create Customer ---
+                var customer = await _db.Customers
+                    .FirstOrDefaultAsync(c => c.Phone == request.Customer.Phone.Trim());
+
+                if (customer == null)
+                {
+                    customer = new Customer
+                    {
+                        Phone = request.Customer.Phone.Trim(),
+                        Name = request.Customer.Name.Trim(),
+                        Email = request.Customer.Email?.Trim()
+                    };
+                    _db.Customers.Add(customer);
+                }
+                else
+                {
+                    customer.Name = request.Customer.Name.Trim();
+                    if (!string.IsNullOrWhiteSpace(request.Customer.Email))
+                        customer.Email = request.Customer.Email.Trim();
+                }
+
+                // --- 2. Generate Order Code ---
+                var orderCode = await GenerateOrderCodeAsync();
+
+                // --- 3. Delivery Details ---
+                if (!Enum.TryParse<DeliveryType>(request.Delivery.Type, out var deliveryType))
+                    throw new OrderValidationException($"Tipo de entrega inválido: {request.Delivery.Type}");
+
+                DeliveryZone? deliveryZone = null;
+                MeetingPoint? meetingPoint = null;
+                decimal? deliveryCost = null;
+                string? deliveryZoneName = null;
+                string? meetingPointName = null;
+
+                switch (deliveryType)
+                {
+                    case DeliveryType.Delivery:
+                        if (request.Delivery.DeliveryZoneId == null)
+                            throw new OrderValidationException("El campo DeliveryZoneId es obligatorio para tipo Delivery.");
+                        deliveryZone = await _db.DeliveryZones.FindAsync(request.Delivery.DeliveryZoneId.Value);
+                        if (deliveryZone == null)
+                            throw new OrderNotFoundException($"Zona de delivery con Id '{request.Delivery.DeliveryZoneId}' no encontrada.");
+                        deliveryCost = deliveryZone.Cost;
+                        deliveryZoneName = deliveryZone.Name;
+                        break;
+                    case DeliveryType.MeetingPoint:
+                        if (request.Delivery.MeetingPointId == null)
+                            throw new OrderValidationException("El campo MeetingPointId es obligatorio para tipo MeetingPoint.");
+                        meetingPoint = await _db.MeetingPoints.FindAsync(request.Delivery.MeetingPointId.Value);
+                        if (meetingPoint == null)
+                            throw new OrderNotFoundException($"Punto de encuentro con Id '{request.Delivery.MeetingPointId}' no encontrado.");
+                        deliveryCost = meetingPoint.Cost;
+                        meetingPointName = meetingPoint.Name;
+                        break;
+                    case DeliveryType.NationalShipping:
+                        deliveryCost = null;
+                        break;
+                }
+
+                // --- 4. Create Order ---
+                var order = new Order
+                {
+                    CustomerId = customer.Id,
+                    OrderCode = orderCode,
+                    DeliveryType = deliveryType,
+                    DeliveryZoneId = deliveryZone?.Id,
+                    MeetingPointId = meetingPoint?.Id,
+                    DeliveryAddress = request.Delivery.DeliveryAddress?.Trim(),
+                    Department = request.Delivery.Department?.Trim(),
+                    Province = request.Delivery.Province?.Trim(),
+                    District = request.Delivery.District?.Trim(),
+                    Subtotal = 0, // Custom order base price is 0 until quoted
+                    DeliveryCost = deliveryCost,
+                    Total = null, // Custom orders always need quoting for total
+                    Status = OrderStatus.WaitingQuote,
+                    IsCustomOrder = true,
+                    ReferenceImageUrl = request.ReferenceImageUrl,
+                    CustomizationNotes = request.CustomizationNotes,
+                    Items = new List<OrderItem>()
+                };
+
+                _db.Orders.Add(order);
+
+                // --- 5. Always Create Quote ---
+                var quote = new Quote
+                {
+                    OrderId = order.Id
+                };
+                _db.Quotes.Add(quote);
+
+                _db.Set<OrderStatusHistory>().Add(new OrderStatusHistory
+                {
+                    OrderId = order.Id,
+                    Status = OrderStatus.WaitingQuote,
+                    Comment = "Pedido personalizado ingresado a cotización."
+                });
+
+                await _db.SaveChangesAsync();
+                if (transaction != null) await transaction.CommitAsync();
+
+                _logger.LogInformation("Pedido Personalizado creado {OrderCode} para cliente {CustomerId}", order.OrderCode, customer.Id);
+
+                await _notificationService.NotifyAsync(order.Id, NotificationType.OrderCreated);
+
+                return new CreateOrderResponse
+                {
+                    Id = order.Id,
+                    OrderCode = order.OrderCode,
+                    DeliveryType = order.DeliveryType.ToString(),
+                    Subtotal = order.Subtotal,
+                    DeliveryCost = order.DeliveryCost,
+                    Total = order.Total,
+                    Status = order.Status.ToString(),
+                    TrackingToken = order.TrackingToken,
+                    CreatedAt = order.CreatedAt,
+                    Items = new List<CreateOrderItemResponse>(),
+                    Delivery = new CreateOrderDeliveryResponse
+                    {
+                        DeliveryZoneName = deliveryZoneName,
+                        MeetingPointName = meetingPointName,
+                        DeliveryAddress = order.DeliveryAddress,
+                        Department = order.Department,
+                        Province = order.Province,
+                        District = order.District
+                    }
+                };
+            }
+            catch
+            {
+                if (transaction != null) await transaction.RollbackAsync();
+                throw;
+            }
+            finally
+            {
+                if (transaction != null) await transaction.DisposeAsync();
+            }
+        }
+
         private async Task<string> GenerateOrderCodeAsync()
         {
             var prefix = "PED-";

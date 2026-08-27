@@ -6,6 +6,7 @@ namespace AuraNova.Application.Quotes.DTOs
         public Guid OrderId { get; set; }
         public string OrderCode { get; set; } = null!;
         public decimal? ShippingCost { get; set; }
+        public decimal CustomizationCost { get; set; }
         public decimal Subtotal { get; set; }
         public decimal? Total { get; set; }
         public string? Notes { get; set; }

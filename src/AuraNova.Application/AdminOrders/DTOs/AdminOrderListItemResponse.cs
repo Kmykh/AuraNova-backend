@@ -12,7 +12,9 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public string Status { get; set; } = string.Empty;
         public decimal Subtotal { get; set; }
         public decimal? DeliveryCost { get; set; }
+        public decimal CustomizationCost { get; set; }
         public decimal? Total { get; set; }
+        public bool IsCustomOrder { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
     }

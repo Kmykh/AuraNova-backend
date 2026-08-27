@@ -13,8 +13,13 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public DateTimeOffset? UpdatedAt { get; set; }
         public decimal Subtotal { get; set; }
         public decimal? DeliveryCost { get; set; }
+        public decimal CustomizationCost { get; set; }
         public decimal? Total { get; set; }
         public bool HasPaymentEvidence { get; set; }
+
+        public bool IsCustomOrder { get; set; }
+        public string? ReferenceImageUrl { get; set; }
+        public string? CustomizationNotes { get; set; }
 
         public AdminOrderCustomer Customer { get; set; } = new();
         public AdminOrderDelivery Delivery { get; set; } = new();
@@ -47,6 +52,7 @@ namespace AuraNova.Application.AdminOrders.DTOs
     {
         public string QuoteStatus { get; set; } = string.Empty;
         public decimal ShippingCost { get; set; }
+        public decimal CustomizationCost { get; set; }
         public string? Notes { get; set; }
         public DateTimeOffset? QuotedAt { get; set; }
     }

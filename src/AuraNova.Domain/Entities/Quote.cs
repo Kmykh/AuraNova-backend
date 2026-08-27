@@ -10,6 +10,7 @@ namespace AuraNova.Domain.Entities
         public Order? Order { get; set; }
 
         public decimal? ShippingCost { get; set; }
+        public decimal CustomizationCost { get; set; }
         public string? Notes { get; set; }
         public QuoteStatus Status { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
