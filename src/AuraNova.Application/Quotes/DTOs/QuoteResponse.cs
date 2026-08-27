@@ -18,5 +18,10 @@ namespace AuraNova.Application.Quotes.DTOs
         // Customer info
         public string CustomerName { get; set; } = null!;
         public string CustomerPhone { get; set; } = null!;
+
+        public bool IsCustomOrder { get; set; }
+        public string? ReferenceImageUrl { get; set; }
+        public string? CustomizationNotes { get; set; }
+        public string DeliveryType { get; set; } = null!;
     }
 }

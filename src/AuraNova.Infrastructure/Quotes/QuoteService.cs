@@ -71,7 +71,17 @@ namespace AuraNova.Infrastructure.Quotes
                 throw new OrderValidationException("El costo de personalización no puede ser negativo.");
 
             // Update Quote
-            quote.ShippingCost = request.ShippingCost;
+            if (order.DeliveryType == DeliveryType.NationalShipping)
+            {
+                quote.ShippingCost = request.ShippingCost;
+                order.DeliveryCost = request.ShippingCost;
+            }
+            else
+            {
+                // Preserve the original delivery cost if it was Delivery or MeetingPoint
+                quote.ShippingCost = order.DeliveryCost ?? 0m;
+            }
+
             quote.CustomizationCost = request.CustomizationCost;
             quote.Notes = request.Notes?.Trim();
             quote.Status = QuoteStatus.Ready;
@@ -79,9 +89,8 @@ namespace AuraNova.Infrastructure.Quotes
             quote.UpdatedAt = DateTimeOffset.UtcNow;
 
             // Update Order
-            order.DeliveryCost = request.ShippingCost;
             order.CustomizationCost = request.CustomizationCost;
-            order.Total = order.Subtotal + request.ShippingCost + request.CustomizationCost;
+            order.Total = order.Subtotal + (order.DeliveryCost ?? 0m) + request.CustomizationCost;
             order.Status = OrderStatus.QuoteReady;
             order.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -89,7 +98,7 @@ namespace AuraNova.Infrastructure.Quotes
             {
                 OrderId = order.Id,
                 Status = OrderStatus.QuoteReady,
-                Comment = $"Cotización lista. Envío: S/ {request.ShippingCost:F2}"
+                Comment = $"Cotización lista. Envío: S/ {(order.DeliveryCost ?? 0m):F2}"
             });
 
             await _db.SaveChangesAsync();
@@ -122,7 +131,11 @@ namespace AuraNova.Infrastructure.Quotes
                 CreatedAt = quote.CreatedAt,
                 QuotedAt = quote.QuotedAt,
                 CustomerName = order.Customer?.Name ?? "",
-                CustomerPhone = order.Customer?.Phone ?? ""
+                CustomerPhone = order.Customer?.Phone ?? "",
+                IsCustomOrder = order.IsCustomOrder,
+                ReferenceImageUrl = order.ReferenceImageUrl,
+                CustomizationNotes = order.CustomizationNotes,
+                DeliveryType = order.DeliveryType.ToString()
             };
 
             return response;
