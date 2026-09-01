@@ -37,6 +37,7 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
                     v => System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(v, (System.Text.Json.JsonSerializerOptions)null) ?? new System.Collections.Generic.List<string>()
                 )
                 .Metadata.SetValueComparer(stringListComparer);
+            builder.Property(p => p.AvailableColors).HasDefaultValueSql("'[]'");
 
             builder.Property(p => p.AvailableFlowerTypes)
                 .HasConversion(
@@ -44,6 +45,7 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
                     v => System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(v, (System.Text.Json.JsonSerializerOptions)null) ?? new System.Collections.Generic.List<string>()
                 )
                 .Metadata.SetValueComparer(stringListComparer);
+            builder.Property(p => p.AvailableFlowerTypes).HasDefaultValueSql("'[]'");
         }
     }
 }
