@@ -185,7 +185,16 @@ namespace AuraNova.Infrastructure.Orders
                         ProductId = product.Id,
                         Quantity = item.Quantity,
                         UnitPrice = product.Price, // Historical price snapshot
-                        Subtotal = itemSubtotal
+                        Subtotal = itemSubtotal,
+                        SelectedPrimaryColor = item.SelectedPrimaryColor,
+                        SelectedSecondaryColor = item.SelectedSecondaryColor,
+                        SelectedFlowerType = item.SelectedFlowerType,
+                        SelectedFlowerColor = item.SelectedFlowerColor,
+                        HasLights = item.HasLights,
+                        HasButterfly = item.HasButterfly,
+                        HasPhraseCard = item.HasPhraseCard,
+                        PhraseText = item.PhraseText,
+                        PhraseFont = item.PhraseFont
                     };
 
                     orderItems.Add(orderItem);
@@ -281,7 +290,16 @@ namespace AuraNova.Infrastructure.Orders
                             ProductName = product.Name,
                             Quantity = oi.Quantity,
                             UnitPrice = oi.UnitPrice,
-                            Subtotal = oi.Subtotal
+                            Subtotal = oi.Subtotal,
+                            SelectedPrimaryColor = oi.SelectedPrimaryColor,
+                            SelectedSecondaryColor = oi.SelectedSecondaryColor,
+                            SelectedFlowerType = oi.SelectedFlowerType,
+                            SelectedFlowerColor = oi.SelectedFlowerColor,
+                            HasLights = oi.HasLights,
+                            HasButterfly = oi.HasButterfly,
+                            HasPhraseCard = oi.HasPhraseCard,
+                            PhraseText = oi.PhraseText,
+                            PhraseFont = oi.PhraseFont
                         };
                     }).ToList(),
                     Delivery = new CreateOrderDeliveryResponse

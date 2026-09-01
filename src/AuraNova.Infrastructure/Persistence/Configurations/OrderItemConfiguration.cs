@@ -22,6 +22,13 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
 
             builder.HasOne(oi => oi.Product).WithMany(p => p.OrderItems).HasForeignKey(oi => oi.ProductId).OnDelete(DeleteBehavior.Restrict);
             builder.HasOne(oi => oi.Order).WithMany(o => o.Items).HasForeignKey(oi => oi.OrderId).OnDelete(DeleteBehavior.Cascade);
+
+            builder.Property(oi => oi.SelectedPrimaryColor).HasMaxLength(50);
+            builder.Property(oi => oi.SelectedSecondaryColor).HasMaxLength(50);
+            builder.Property(oi => oi.SelectedFlowerType).HasMaxLength(100);
+            builder.Property(oi => oi.SelectedFlowerColor).HasMaxLength(50);
+            builder.Property(oi => oi.PhraseText).HasMaxLength(1000);
+            builder.Property(oi => oi.PhraseFont).HasMaxLength(50);
         }
     }
 }

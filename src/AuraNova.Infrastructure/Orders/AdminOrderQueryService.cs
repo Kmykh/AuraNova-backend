@@ -137,7 +137,16 @@ namespace AuraNova.Infrastructure.Orders
                     ProductName = i.Product?.Name ?? string.Empty,
                     Quantity = i.Quantity,
                     UnitPrice = i.UnitPrice,
-                    Subtotal = i.Subtotal
+                    Subtotal = i.Subtotal,
+                    SelectedPrimaryColor = i.SelectedPrimaryColor,
+                    SelectedSecondaryColor = i.SelectedSecondaryColor,
+                    SelectedFlowerType = i.SelectedFlowerType,
+                    SelectedFlowerColor = i.SelectedFlowerColor,
+                    HasLights = i.HasLights,
+                    HasButterfly = i.HasButterfly,
+                    HasPhraseCard = i.HasPhraseCard,
+                    PhraseText = i.PhraseText,
+                    PhraseFont = i.PhraseFont
                 }).ToList() ?? new List<AdminOrderItem>(),
                 StatusHistory = order.StatusHistory?.OrderByDescending(h => h.CreatedAt).Select(h => new AdminOrderStatusHistory
                 {

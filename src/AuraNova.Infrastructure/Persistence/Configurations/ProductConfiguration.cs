@@ -25,6 +25,25 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
 
             builder.Property(p => p.CreatedAt).IsRequired();
             builder.Property(p => p.UpdatedAt);
+
+            var stringListComparer = new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<System.Collections.Generic.List<string>>(
+                (c1, c2) => (c1 != null ? c1.Count : 0) == (c2 != null ? c2.Count : 0) && (c1 == null || c1.SequenceEqual(c2!)),
+                c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                c => c.ToList());
+
+            builder.Property(p => p.AvailableColors)
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions)null),
+                    v => System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(v, (System.Text.Json.JsonSerializerOptions)null) ?? new System.Collections.Generic.List<string>()
+                )
+                .Metadata.SetValueComparer(stringListComparer);
+
+            builder.Property(p => p.AvailableFlowerTypes)
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions)null),
+                    v => System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(v, (System.Text.Json.JsonSerializerOptions)null) ?? new System.Collections.Generic.List<string>()
+                )
+                .Metadata.SetValueComparer(stringListComparer);
         }
     }
 }

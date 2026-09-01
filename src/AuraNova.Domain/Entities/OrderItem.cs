@@ -15,6 +15,17 @@ namespace AuraNova.Domain.Entities
         public decimal UnitPrice { get; set; }
         public decimal Subtotal { get; set; }
 
+        // Customer Selection
+        public string? SelectedPrimaryColor { get; set; }
+        public string? SelectedSecondaryColor { get; set; }
+        public string? SelectedFlowerType { get; set; }
+        public string? SelectedFlowerColor { get; set; }
+        public bool HasLights { get; set; } = false;
+        public bool HasButterfly { get; set; } = false;
+        public bool HasPhraseCard { get; set; } = false;
+        public string? PhraseText { get; set; }
+        public string? PhraseFont { get; set; }
+
         public OrderItem()
         {
             Id = Guid.NewGuid();

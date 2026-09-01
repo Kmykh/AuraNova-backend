@@ -22,6 +22,16 @@ namespace AuraNova.Application.Orders.DTOs
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal Subtotal { get; set; }
+
+        public string? SelectedPrimaryColor { get; set; }
+        public string? SelectedSecondaryColor { get; set; }
+        public string? SelectedFlowerType { get; set; }
+        public string? SelectedFlowerColor { get; set; }
+        public bool HasLights { get; set; }
+        public bool HasButterfly { get; set; }
+        public bool HasPhraseCard { get; set; }
+        public string? PhraseText { get; set; }
+        public string? PhraseFont { get; set; }
     }
 
     public class CreateOrderDeliveryResponse

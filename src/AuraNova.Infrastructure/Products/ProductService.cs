@@ -27,7 +27,12 @@ namespace AuraNova.Infrastructure.Products
                 Price = request.Price,
                 ImageUrl = request.ImageUrl?.Trim(),
                 Stock = request.Stock,
-                IsAvailable = true
+                IsAvailable = true,
+                AvailableColors = request.AvailableColors ?? new List<string>(),
+                AvailableFlowerTypes = request.AvailableFlowerTypes ?? new List<string>(),
+                AllowsLights = request.AllowsLights,
+                AllowsButterfly = request.AllowsButterfly,
+                AllowsPhraseCard = request.AllowsPhraseCard
             };
 
             _db.Products.Add(product);
@@ -63,6 +68,11 @@ namespace AuraNova.Infrastructure.Products
             product.Description = request.Description?.Trim();
             product.Price = request.Price;
             product.ImageUrl = request.ImageUrl?.Trim();
+            product.AvailableColors = request.AvailableColors ?? new List<string>();
+            product.AvailableFlowerTypes = request.AvailableFlowerTypes ?? new List<string>();
+            product.AllowsLights = request.AllowsLights;
+            product.AllowsButterfly = request.AllowsButterfly;
+            product.AllowsPhraseCard = request.AllowsPhraseCard;
             product.UpdatedAt = DateTimeOffset.UtcNow;
 
             _db.Products.Update(product);
@@ -138,7 +148,12 @@ namespace AuraNova.Infrastructure.Products
                 Stock = product.Stock,
                 IsAvailable = product.IsAvailable,
                 CreatedAt = product.CreatedAt,
-                UpdatedAt = product.UpdatedAt
+                UpdatedAt = product.UpdatedAt,
+                AvailableColors = product.AvailableColors ?? new List<string>(),
+                AvailableFlowerTypes = product.AvailableFlowerTypes ?? new List<string>(),
+                AllowsLights = product.AllowsLights,
+                AllowsButterfly = product.AllowsButterfly,
+                AllowsPhraseCard = product.AllowsPhraseCard
             };
         }
     }

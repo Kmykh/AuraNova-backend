@@ -15,6 +15,13 @@ namespace AuraNova.Domain.Entities
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
 
+        // Customization Configuration
+        public List<string> AvailableColors { get; set; } = new List<string>();
+        public List<string> AvailableFlowerTypes { get; set; } = new List<string>();
+        public bool AllowsLights { get; set; } = false;
+        public bool AllowsButterfly { get; set; } = false;
+        public bool AllowsPhraseCard { get; set; } = false;
+
         public ICollection<OrderItem>? OrderItems { get; set; }
 
         public Product()
