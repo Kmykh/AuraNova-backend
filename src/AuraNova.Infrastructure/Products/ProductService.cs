@@ -1,3 +1,4 @@
+using AuraNova.Application.Categories.DTOs;
 using AuraNova.Application.Products.DTOs;
 using AuraNova.Application.Products.Interfaces;
 using AuraNova.Domain.Entities;
@@ -20,6 +21,15 @@ namespace AuraNova.Infrastructure.Products
 
         public async Task<ProductResponse> CreateAsync(CreateProductRequest request)
         {
+            if (request.CategoryId.HasValue)
+            {
+                var category = await _db.Categories.FindAsync(request.CategoryId.Value);
+                if (category == null || !category.IsActive)
+                {
+                    throw new System.Exception("Categoría inválida o inactiva");
+                }
+            }
+
             var product = new Product
             {
                 Name = request.Name.Trim(),
@@ -32,7 +42,9 @@ namespace AuraNova.Infrastructure.Products
                 AvailableFlowerTypes = request.AvailableFlowerTypes ?? new List<string>(),
                 AllowsLights = request.AllowsLights,
                 AllowsButterfly = request.AllowsButterfly,
-                AllowsPhraseCard = request.AllowsPhraseCard
+                AllowsPhraseCard = request.AllowsPhraseCard,
+                CategoryId = request.CategoryId,
+                Audience = request.Audience
             };
 
             _db.Products.Add(product);
@@ -46,6 +58,7 @@ namespace AuraNova.Infrastructure.Products
         public async Task<IReadOnlyList<ProductResponse>> GetAdminProductsAsync()
         {
             var products = await _db.Products
+                .Include(p => p.Category)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
 
@@ -54,15 +67,24 @@ namespace AuraNova.Infrastructure.Products
 
         public async Task<ProductResponse?> GetAdminByIdAsync(Guid id)
         {
-            var product = await _db.Products.FindAsync(id);
+            var product = await _db.Products.Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id);
             return product == null ? null : MapToResponse(product);
         }
 
         public async Task<ProductResponse?> UpdateAsync(Guid id, UpdateProductRequest request)
         {
-            var product = await _db.Products.FindAsync(id);
+            var product = await _db.Products.Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id);
             if (product == null)
                 return null;
+
+            if (request.CategoryId.HasValue && request.CategoryId != product.CategoryId)
+            {
+                var category = await _db.Categories.FindAsync(request.CategoryId.Value);
+                if (category == null || !category.IsActive)
+                {
+                    throw new System.Exception("Categoría inválida o inactiva");
+                }
+            }
 
             product.Name = request.Name.Trim();
             product.Description = request.Description?.Trim();
@@ -73,6 +95,8 @@ namespace AuraNova.Infrastructure.Products
             product.AllowsLights = request.AllowsLights;
             product.AllowsButterfly = request.AllowsButterfly;
             product.AllowsPhraseCard = request.AllowsPhraseCard;
+            product.CategoryId = request.CategoryId;
+            product.Audience = request.Audience;
             product.UpdatedAt = DateTimeOffset.UtcNow;
 
             _db.Products.Update(product);
@@ -120,6 +144,7 @@ namespace AuraNova.Infrastructure.Products
         public async Task<IReadOnlyList<ProductResponse>> GetPublicProductsAsync()
         {
             var products = await _db.Products
+                .Include(p => p.Category)
                 .Where(p => p.IsAvailable)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
@@ -129,7 +154,7 @@ namespace AuraNova.Infrastructure.Products
 
         public async Task<ProductResponse?> GetPublicByIdAsync(Guid id)
         {
-            var product = await _db.Products.FindAsync(id);
+            var product = await _db.Products.Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id);
             if (product == null || !product.IsAvailable)
                 return null;
 
@@ -153,7 +178,18 @@ namespace AuraNova.Infrastructure.Products
                 AvailableFlowerTypes = product.AvailableFlowerTypes ?? new List<string>(),
                 AllowsLights = product.AllowsLights,
                 AllowsButterfly = product.AllowsButterfly,
-                AllowsPhraseCard = product.AllowsPhraseCard
+                AllowsPhraseCard = product.AllowsPhraseCard,
+                Audience = product.Audience,
+                Category = product.Category != null ? new CategoryResponse
+                {
+                    Id = product.Category.Id,
+                    Name = product.Category.Name,
+                    Slug = product.Category.Slug,
+                    Description = product.Category.Description,
+                    IsActive = product.Category.IsActive,
+                    CreatedAt = product.Category.CreatedAt,
+                    UpdatedAt = product.Category.UpdatedAt
+                } : null
             };
         }
     }

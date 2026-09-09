@@ -15,6 +15,10 @@ namespace AuraNova.Domain.Entities
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
 
+        public Guid? CategoryId { get; set; }
+        public Category? Category { get; set; }
+        public AuraNova.Domain.Enums.ProductAudience? Audience { get; set; }
+
         // Customization Configuration
         public List<string> AvailableColors { get; set; } = new List<string>();
         public List<string> AvailableFlowerTypes { get; set; } = new List<string>();

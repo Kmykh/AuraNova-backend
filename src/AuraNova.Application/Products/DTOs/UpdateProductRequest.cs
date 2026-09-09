@@ -1,5 +1,8 @@
 using System.Collections.Generic;
 
+using System;
+using AuraNova.Domain.Enums;
+
 namespace AuraNova.Application.Products.DTOs
 {
     public class UpdateProductRequest
@@ -8,6 +11,9 @@ namespace AuraNova.Application.Products.DTOs
         public string? Description { get; set; }
         public decimal Price { get; set; }
         public string? ImageUrl { get; set; }
+
+        public Guid? CategoryId { get; set; }
+        public ProductAudience? Audience { get; set; }
 
         public List<string> AvailableColors { get; set; } = new List<string>();
         public List<string> AvailableFlowerTypes { get; set; } = new List<string>();

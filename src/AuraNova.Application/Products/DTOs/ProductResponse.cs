@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 
+using AuraNova.Application.Categories.DTOs;
+using AuraNova.Domain.Enums;
+
 namespace AuraNova.Application.Products.DTOs
 {
     public class ProductResponse
@@ -14,6 +17,9 @@ namespace AuraNova.Application.Products.DTOs
         public bool IsAvailable { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
+
+        public CategoryResponse? Category { get; set; }
+        public ProductAudience? Audience { get; set; }
 
         public List<string> AvailableColors { get; set; } = new List<string>();
         public List<string> AvailableFlowerTypes { get; set; } = new List<string>();

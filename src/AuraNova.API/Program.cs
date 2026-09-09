@@ -1,10 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using AuraNova.Infrastructure.Persistence;
-using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using AuraNova.API.Middlewares;
 using AuraNova.API.Configuration;
-using Microsoft.AspNetCore.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,6 +81,9 @@ builder.Services.AddScoped<AuraNova.Application.Auth.Interfaces.IAuthService, Au
 // register product services
 builder.Services.AddScoped<AuraNova.Application.Products.Interfaces.IProductService, AuraNova.Infrastructure.Products.ProductService>();
 
+// register category services
+builder.Services.AddScoped<AuraNova.Application.Categories.Interfaces.ICategoryService, AuraNova.Infrastructure.Categories.CategoryService>();
+
 // register order services
 builder.Services.AddScoped<AuraNova.Application.Orders.Interfaces.IOrderService, AuraNova.Infrastructure.Orders.OrderService>();
 
@@ -148,7 +149,7 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        if (securitySettings.AllowedOrigins != null && securitySettings.AllowedOrigins.Length > 0 && securitySettings.AllowedOrigins[0] != "*")
+        if (securitySettings.AllowedOrigins is { Length: > 0 } && securitySettings.AllowedOrigins[0] != "*")
         {
             policy.WithOrigins(securitySettings.AllowedOrigins)
                   .AllowAnyHeader()
