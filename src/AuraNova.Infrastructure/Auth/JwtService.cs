@@ -30,13 +30,25 @@ namespace AuraNova.Infrastructure.Auth
 
         public string GenerateToken(AdminUser user)
         {
-            var claims = new[]
+            var userRole = string.IsNullOrWhiteSpace(user.Role) ? "Admin" : user.Role;
+            // Capitalize role to ensure it matches exactly with [Authorize(Roles = "Admin")]
+            if (userRole.Equals("admin", StringComparison.OrdinalIgnoreCase)) userRole = "Admin";
+            if (userRole.Equals("superadmin", StringComparison.OrdinalIgnoreCase)) userRole = "SuperAdmin";
+
+            var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
                 new Claim("name", user.Name),
-                new Claim(ClaimTypes.Role, string.IsNullOrWhiteSpace(user.Role) ? "Admin" : user.Role)
+                new Claim(ClaimTypes.Role, userRole),
+                new Claim("role", userRole) // Add a simple role claim for frontend decoding
             };
+
+            // If user is SuperAdmin, they should also inherit the Admin role to access Admin endpoints
+            if (userRole == "SuperAdmin")
+            {
+                claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+            }
 
             var creds = new SigningCredentials(new SymmetricSecurityKey(_key), SecurityAlgorithms.HmacSha256);
             var expires = DateTime.UtcNow.AddMinutes(_settings.ExpirationMinutes);

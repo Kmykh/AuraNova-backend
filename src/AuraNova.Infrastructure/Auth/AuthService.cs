@@ -47,7 +47,9 @@ namespace AuraNova.Infrastructure.Auth
                 {
                     Id = user.Id,
                     Name = user.Name,
-                    Email = user.Email
+                    Email = user.Email,
+                    Role = string.IsNullOrWhiteSpace(user.Role) ? "Admin" : 
+                           user.Role.Equals("superadmin", System.StringComparison.OrdinalIgnoreCase) ? "SuperAdmin" : "Admin"
                 }
             };
         }
