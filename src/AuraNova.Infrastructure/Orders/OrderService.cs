@@ -9,18 +9,17 @@ using Microsoft.Extensions.Logging;
 
 namespace AuraNova.Infrastructure.Orders
 {
-    public class OrderService : IOrderService
+    public class OrderService(
+        AppDbContext db,
+        INotificationService notificationService,
+        ILogger<OrderService> logger,
+        IOrderStatusTransitionService transitionService) : IOrderService
     {
-        private readonly AppDbContext _db;
-        private readonly INotificationService _notificationService;
-        private readonly ILogger<OrderService> _logger;
+        private readonly AppDbContext _db = db;
+        private readonly INotificationService _notificationService = notificationService;
+        private readonly ILogger<OrderService> _logger = logger;
+        private readonly IOrderStatusTransitionService _transitionService = transitionService;
 
-        public OrderService(AppDbContext db, INotificationService notificationService, ILogger<OrderService> logger)
-        {
-            _db = db;
-            _notificationService = notificationService;
-            _logger = logger;
-        }
 
         public async Task<CreateOrderResponse> CreateAsync(CreateOrderRequest request)
         {
@@ -72,7 +71,7 @@ namespace AuraNova.Infrastructure.Orders
                 if (product.Stock < item.Quantity)
                     throw new OrderValidationException(
                         $"Stock insuficiente para '{product.Name}'. Disponible: {product.Stock}, solicitado: {item.Quantity}.");
-                        
+
                 // Deduct stock to reserve the items
                 product.Stock -= item.Quantity;
             }
@@ -86,7 +85,7 @@ namespace AuraNova.Infrastructure.Orders
                     $"Tipo de entrega inválido: '{request.Delivery.Type}'. Valores válidos: Delivery, MeetingPoint, NationalShipping.");
 
             // Delivery-type-specific validation and cost resolution
-            decimal? deliveryCost = null;
+            decimal? deliveryCost;
             DeliveryZone? deliveryZone = null;
             MeetingPoint? meetingPoint = null;
             OrderStatus initialStatus;
@@ -97,10 +96,12 @@ namespace AuraNova.Infrastructure.Orders
             {
                 case DeliveryType.Delivery:
                     if (request.Delivery.DeliveryZoneId == null)
-                        throw new OrderValidationException("El campo DeliveryZoneId es obligatorio para tipo Delivery.");
+                        throw new OrderValidationException(
+                            "El campo DeliveryZoneId es obligatorio para tipo Delivery.");
 
                     if (string.IsNullOrWhiteSpace(request.Delivery.DeliveryAddress))
-                        throw new OrderValidationException("El campo DeliveryAddress es obligatorio para tipo Delivery.");
+                        throw new OrderValidationException(
+                            "El campo DeliveryAddress es obligatorio para tipo Delivery.");
 
                     deliveryZone = await _db.DeliveryZones.FindAsync(request.Delivery.DeliveryZoneId.Value);
                     if (deliveryZone == null)
@@ -118,7 +119,8 @@ namespace AuraNova.Infrastructure.Orders
 
                 case DeliveryType.MeetingPoint:
                     if (request.Delivery.MeetingPointId == null)
-                        throw new OrderValidationException("El campo MeetingPointId es obligatorio para tipo MeetingPoint.");
+                        throw new OrderValidationException(
+                            "El campo MeetingPointId es obligatorio para tipo MeetingPoint.");
 
                     meetingPoint = await _db.MeetingPoints.FindAsync(request.Delivery.MeetingPointId.Value);
                     if (meetingPoint == null)
@@ -142,8 +144,8 @@ namespace AuraNova.Infrastructure.Orders
                     if (string.IsNullOrWhiteSpace(request.Delivery.District))
                         throw new OrderValidationException("El campo District es obligatorio para envío nacional.");
 
-                    deliveryCost = null; // Will be set after quoting
-                    initialStatus = OrderStatus.WaitingQuote;
+                    deliveryCost = null; // Costo asumido por el cliente en destino
+                    initialStatus = OrderStatus.WaitingPayment;
                     break;
 
                 default:
@@ -204,7 +206,7 @@ namespace AuraNova.Infrastructure.Orders
                 // Calculate total
                 decimal? orderTotal = deliveryCost.HasValue
                     ? orderSubtotal + deliveryCost.Value
-                    : null; // NationalShipping: total unknown until quoted
+                    : orderSubtotal; // Para NationalShipping, el total es solo el subtotal de productos
 
                 // Create Order
                 var order = new Order
@@ -227,8 +229,8 @@ namespace AuraNova.Infrastructure.Orders
 
                 _db.Orders.Add(order);
 
-                // For Delivery and MeetingPoint, create Payment
-                if (deliveryType != DeliveryType.NationalShipping && orderTotal.HasValue)
+                // Create Payment for all standard orders
+                if (orderTotal.HasValue)
                 {
                     var payment = new Payment
                     {
@@ -239,16 +241,6 @@ namespace AuraNova.Infrastructure.Orders
                     _db.Payments.Add(payment);
                 }
 
-                // For NationalShipping, create a Quote with Pending status
-                if (deliveryType == DeliveryType.NationalShipping)
-                {
-                    var quote = new Quote
-                    {
-                        OrderId = order.Id
-                        // ShippingCost = null, Status = Pending (set by constructor)
-                    };
-                    _db.Quotes.Add(quote);
-                }
 
                 // Create initial status history entry
                 _db.Set<OrderStatusHistory>().Add(new OrderStatusHistory
@@ -281,27 +273,30 @@ namespace AuraNova.Infrastructure.Orders
                     Status = order.Status.ToString(),
                     TrackingToken = order.TrackingToken,
                     CreatedAt = order.CreatedAt,
-                    Items = orderItems.Select(oi =>
-                    {
-                        var product = products.First(p => p.Id == oi.ProductId);
-                        return new CreateOrderItemResponse
+                    Items =
+                    [
+                        .. orderItems.Select(oi =>
                         {
-                            ProductId = oi.ProductId,
-                            ProductName = product.Name,
-                            Quantity = oi.Quantity,
-                            UnitPrice = oi.UnitPrice,
-                            Subtotal = oi.Subtotal,
-                            SelectedPrimaryColor = oi.SelectedPrimaryColor,
-                            SelectedSecondaryColor = oi.SelectedSecondaryColor,
-                            SelectedFlowerType = oi.SelectedFlowerType,
-                            SelectedFlowerColor = oi.SelectedFlowerColor,
-                            HasLights = oi.HasLights,
-                            HasButterfly = oi.HasButterfly,
-                            HasPhraseCard = oi.HasPhraseCard,
-                            PhraseText = oi.PhraseText,
-                            PhraseFont = oi.PhraseFont
-                        };
-                    }).ToList(),
+                            var product = products.First(p => p.Id == oi.ProductId);
+                            return new CreateOrderItemResponse
+                            {
+                                ProductId = oi.ProductId,
+                                ProductName = product.Name,
+                                Quantity = oi.Quantity,
+                                UnitPrice = oi.UnitPrice,
+                                Subtotal = oi.Subtotal,
+                                SelectedPrimaryColor = oi.SelectedPrimaryColor,
+                                SelectedSecondaryColor = oi.SelectedSecondaryColor,
+                                SelectedFlowerType = oi.SelectedFlowerType,
+                                SelectedFlowerColor = oi.SelectedFlowerColor,
+                                HasLights = oi.HasLights,
+                                HasButterfly = oi.HasButterfly,
+                                HasPhraseCard = oi.HasPhraseCard,
+                                PhraseText = oi.PhraseText,
+                                PhraseFont = oi.PhraseFont
+                            };
+                        })
+                    ],
                     Delivery = new CreateOrderDeliveryResponse
                     {
                         DeliveryZoneName = deliveryZoneName,
@@ -330,7 +325,6 @@ namespace AuraNova.Infrastructure.Orders
         /// Generates a unique, human-readable order code in format PED-YYYY-NNNNNN.
         /// Uses the max existing sequence number for the current year to avoid gaps/collisions.
         /// </summary>
-
         public async Task<CreateOrderResponse> CreateCustomAsync(CreateCustomOrderRequest request)
         {
             var supportsTransactions = _db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory";
@@ -379,19 +373,23 @@ namespace AuraNova.Infrastructure.Orders
                 {
                     case DeliveryType.Delivery:
                         if (request.Delivery.DeliveryZoneId == null)
-                            throw new OrderValidationException("El campo DeliveryZoneId es obligatorio para tipo Delivery.");
+                            throw new OrderValidationException(
+                                "El campo DeliveryZoneId es obligatorio para tipo Delivery.");
                         deliveryZone = await _db.DeliveryZones.FindAsync(request.Delivery.DeliveryZoneId.Value);
                         if (deliveryZone == null)
-                            throw new OrderNotFoundException($"Zona de delivery con Id '{request.Delivery.DeliveryZoneId}' no encontrada.");
+                            throw new OrderNotFoundException(
+                                $"Zona de delivery con Id '{request.Delivery.DeliveryZoneId}' no encontrada.");
                         deliveryCost = deliveryZone.Cost;
                         deliveryZoneName = deliveryZone.Name;
                         break;
                     case DeliveryType.MeetingPoint:
                         if (request.Delivery.MeetingPointId == null)
-                            throw new OrderValidationException("El campo MeetingPointId es obligatorio para tipo MeetingPoint.");
+                            throw new OrderValidationException(
+                                "El campo MeetingPointId es obligatorio para tipo MeetingPoint.");
                         meetingPoint = await _db.MeetingPoints.FindAsync(request.Delivery.MeetingPointId.Value);
                         if (meetingPoint == null)
-                            throw new OrderNotFoundException($"Punto de encuentro con Id '{request.Delivery.MeetingPointId}' no encontrado.");
+                            throw new OrderNotFoundException(
+                                $"Punto de encuentro con Id '{request.Delivery.MeetingPointId}' no encontrado.");
                         deliveryCost = meetingPoint.Cost;
                         meetingPointName = meetingPoint.Name;
                         break;
@@ -441,7 +439,8 @@ namespace AuraNova.Infrastructure.Orders
                 await _db.SaveChangesAsync();
                 if (transaction != null) await transaction.CommitAsync();
 
-                _logger.LogInformation("Pedido Personalizado creado {OrderCode} para cliente {CustomerId}", order.OrderCode, customer.Id);
+                _logger.LogInformation("Pedido Personalizado creado {OrderCode} para cliente {CustomerId}",
+                    order.OrderCode, customer.Id);
 
                 await _notificationService.NotifyAsync(order.Id, NotificationType.OrderCreated);
 
@@ -456,7 +455,7 @@ namespace AuraNova.Infrastructure.Orders
                     Status = order.Status.ToString(),
                     TrackingToken = order.TrackingToken,
                     CreatedAt = order.CreatedAt,
-                    Items = new List<CreateOrderItemResponse>(),
+                    Items = [],
                     Delivery = new CreateOrderDeliveryResponse
                     {
                         DeliveryZoneName = deliveryZoneName,
@@ -514,7 +513,8 @@ namespace AuraNova.Infrastructure.Orders
                 throw new OrderNotFoundException($"Pedido con Id '{orderId}' no encontrado.");
 
             if (order.Status != OrderStatus.QuoteReady)
-                throw new OrderValidationException($"El pedido '{order.OrderCode}' no tiene una cotización lista para aceptar. Estado actual: {order.Status}");
+                throw new OrderValidationException(
+                    $"El pedido '{order.OrderCode}' no tiene una cotización lista para aceptar. Estado actual: {order.Status}");
 
             if (order.Total == null)
                 throw new OrderValidationException("El pedido no tiene un total definido.");
@@ -544,24 +544,129 @@ namespace AuraNova.Infrastructure.Orders
 
             await _db.SaveChangesAsync();
 
-            _logger.LogInformation("Cotización aceptada para pedido {OrderCode}. Payment {PaymentId} generado.", order.OrderCode, payment.Id);
+            _logger.LogInformation("Cotización aceptada para pedido {OrderCode}. Payment {PaymentId} generado.",
+                order.OrderCode, payment.Id);
             return true;
+        }
+
+        public async Task StartPreparationAsync(Guid id)
+        {
+            var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == id);
+            if (order == null) throw new OrderNotFoundException("Pedido no encontrado.");
+
+            if (!_transitionService.IsTransitionAllowed(order.Status, OrderStatus.Preparing, order.DeliveryType))
+                throw new OrderValidationException(
+                    $"No se puede iniciar preparación desde el estado actual {order.Status}.");
+
+            order.Status = OrderStatus.Preparing;
+            order.StartedAt = DateTimeOffset.UtcNow;
+
+            _db.Set<OrderStatusHistory>().Add(new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                Status = OrderStatus.Preparing,
+                Comment = "Elaboración iniciada"
+            });
+
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task SetEstimatedReadyDateAsync(Guid id, DateTimeOffset estimatedDate)
+        {
+            var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == id);
+            if (order == null) throw new OrderNotFoundException("Pedido no encontrado.");
+
+            order.EstimatedReadyAt = estimatedDate;
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task MarkAsReadyAsync(Guid id)
+        {
+            var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == id);
+            if (order == null) throw new OrderNotFoundException("Pedido no encontrado.");
+
+            if (!_transitionService.IsTransitionAllowed(order.Status, OrderStatus.Ready, order.DeliveryType))
+                throw new OrderValidationException(
+                    $"No se puede marcar como listo desde el estado actual {order.Status}.");
+
+            order.Status = OrderStatus.Ready;
+            order.ReadyAt = DateTimeOffset.UtcNow;
+
+            _db.Set<OrderStatusHistory>().Add(new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                Status = OrderStatus.Ready,
+                Comment = "Pedido listo"
+            });
+
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task DeliverToAgencyAsync(Guid id, string provider, string trackingCode, string? proofUrl)
+        {
+            var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == id);
+            if (order == null) throw new OrderNotFoundException("Pedido no encontrado.");
+
+            if (order.DeliveryType != DeliveryType.NationalShipping)
+                throw new OrderValidationException("Solo los envíos nacionales pueden entregarse a agencia.");
+
+            if (!_transitionService.IsTransitionAllowed(order.Status, OrderStatus.DeliveredToAgency,
+                    order.DeliveryType))
+                throw new OrderValidationException(
+                    $"No se puede registrar entrega en agencia desde el estado actual {order.Status}.");
+
+            if (string.IsNullOrWhiteSpace(provider))
+                throw new OrderValidationException("El proveedor de envío es obligatorio.");
+
+            order.Status = OrderStatus.DeliveredToAgency;
+            order.DeliveredToAgencyAt = DateTimeOffset.UtcNow;
+            order.ShippingProvider = provider;
+            order.ShippingTrackingCode = trackingCode;
+            order.ShippingProofUrl = proofUrl;
+
+            _db.Set<OrderStatusHistory>().Add(new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                Status = OrderStatus.DeliveredToAgency,
+                Comment = $"Entregado a {provider} - Tracking: {trackingCode}"
+            });
+
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task CancelAsync(Guid id, string reason)
+        {
+            var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == id);
+            if (order == null) throw new OrderNotFoundException("Pedido no encontrado.");
+
+            if (!_transitionService.IsTransitionAllowed(order.Status, OrderStatus.Cancelled, order.DeliveryType))
+                throw new OrderValidationException($"No se puede cancelar desde el estado {order.Status}.");
+
+            order.Status = OrderStatus.Cancelled;
+            order.UpdatedAt = DateTimeOffset.UtcNow;
+
+            _db.Set<OrderStatusHistory>().Add(new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                Status = OrderStatus.Cancelled,
+                Comment = $"Cancelado: {reason}"
+            });
+
+            await _db.SaveChangesAsync();
         }
     }
 
     /// <summary>
     /// Thrown when order validation fails (invalid data, unavailable product, insufficient stock, duplicates).
     /// </summary>
-    public class OrderValidationException : Exception
+    public class OrderValidationException(string message) : Exception(message)
     {
-        public OrderValidationException(string message) : base(message) { }
     }
 
     /// <summary>
     /// Thrown when a referenced product does not exist.
     /// </summary>
-    public class OrderNotFoundException : Exception
+    public class OrderNotFoundException(string message) : Exception(message)
     {
-        public OrderNotFoundException(string message) : base(message) { }
     }
 }

@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+
 using AuraNova.Application.Notifications.DTOs;
 using AuraNova.Application.Notifications.Interfaces;
 using AuraNova.Application.WhatsApp.Interfaces;
@@ -10,30 +7,33 @@ using AuraNova.Domain.Enums;
 using AuraNova.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 
 namespace AuraNova.Infrastructure.Notifications
 {
-    public class NotificationService : INotificationService
+    public class NotificationService(
+        AppDbContext db,
+        INotificationTemplateService templateService,
+        IWhatsAppMessageService whatsAppService,
+        ILogger<NotificationService> logger,
+        IConfiguration configuration) : INotificationService
     {
-        private readonly AppDbContext _db;
-        private readonly INotificationTemplateService _templateService;
-        private readonly IWhatsAppMessageService _whatsAppService;
-        private readonly ILogger<NotificationService> _logger;
+        private readonly AppDbContext _db = db;
+        private readonly INotificationTemplateService _templateService = templateService;
+        private readonly IWhatsAppMessageService _whatsAppService = whatsAppService;
+        private readonly ILogger<NotificationService> _logger = logger;
+        private readonly IConfiguration _configuration = configuration;
 
-        public NotificationService(
-            AppDbContext db,
-            INotificationTemplateService templateService,
-            IWhatsAppMessageService whatsAppService,
-            ILogger<NotificationService> logger)
-        {
-            _db = db;
-            _templateService = templateService;
-            _whatsAppService = whatsAppService;
-            _logger = logger;
-        }
 
         public async Task NotifyAsync(Guid orderId, NotificationType type, string? reason = null)
         {
+            var enabledStr = _configuration["NotificationSettings:Enabled"];
+            if (bool.TryParse(enabledStr, out var enabled) && !enabled)
+            {
+                _logger.LogInformation("Notificaciones están desactivadas. Omitiendo notificación {Type} para pedido {OrderId}.", type, orderId);
+                return;
+            }
+
             try
             {
                 var order = await _db.Orders

@@ -37,6 +37,7 @@ namespace AuraNova.Infrastructure.Dashboard
             response.Orders.Preparing = orderCounts.GetValueOrDefault(OrderStatus.Preparing, 0);
             response.Orders.Ready = orderCounts.GetValueOrDefault(OrderStatus.Ready, 0);
             response.Orders.Shipped = orderCounts.GetValueOrDefault(OrderStatus.Shipped, 0);
+            response.Orders.DeliveredToAgency = orderCounts.GetValueOrDefault(OrderStatus.DeliveredToAgency, 0);
             response.Orders.Delivered = orderCounts.GetValueOrDefault(OrderStatus.Delivered, 0);
             response.Orders.Cancelled = orderCounts.GetValueOrDefault(OrderStatus.Cancelled, 0);
 

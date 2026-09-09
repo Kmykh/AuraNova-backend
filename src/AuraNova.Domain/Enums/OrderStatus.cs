@@ -11,6 +11,7 @@ namespace AuraNova.Domain.Enums
         Ready,
         Shipped,
         Delivered,
+        DeliveredToAgency,
         Cancelled
     }
 }

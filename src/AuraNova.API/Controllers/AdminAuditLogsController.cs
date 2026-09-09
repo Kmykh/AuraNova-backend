@@ -9,7 +9,7 @@ namespace AuraNova.API.Controllers
 {
     [ApiController]
     [Route("api/admin/audit-logs")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "SuperAdmin")]
     [EnableRateLimiting("admin_policy")]
     public class AdminAuditLogsController : ControllerBase
     {

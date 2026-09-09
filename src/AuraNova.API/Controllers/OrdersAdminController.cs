@@ -1,16 +1,14 @@
-using System;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.RateLimiting;
+using AuraNova.API.Extensions;
 using AuraNova.Application.AdminOrders.DTOs;
 using AuraNova.Application.AdminOrders.Interfaces;
+using AuraNova.Application.Audit.Interfaces;
 using AuraNova.Application.Orders.DTOs;
 using AuraNova.Application.Orders.Interfaces;
-using AuraNova.Application.Audit.Interfaces;
-using AuraNova.API.Extensions;
 using AuraNova.Domain.Enums;
 using AuraNova.Infrastructure.Orders;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AuraNova.API.Controllers
 {
@@ -18,18 +16,17 @@ namespace AuraNova.API.Controllers
     [Route("api/admin/orders")]
     [Authorize(Roles = "Admin")]
     [EnableRateLimiting("admin_policy")]
-    public class OrdersAdminController : ControllerBase
+    public class OrdersAdminController(
+        IOrderStatusService statusService,
+        IAdminOrderQueryService queryService,
+        IAdminAuditService auditService,
+        IOrderService orderService) : ControllerBase
     {
-        private readonly IOrderStatusService _statusService;
-        private readonly IAdminOrderQueryService _queryService;
-        private readonly IAdminAuditService _auditService;
+        private readonly IOrderStatusService _statusService = statusService;
+        private readonly IAdminOrderQueryService _queryService = queryService;
+        private readonly IAdminAuditService _auditService = auditService;
+        private readonly IOrderService _orderService = orderService;
 
-        public OrdersAdminController(IOrderStatusService statusService, IAdminOrderQueryService queryService, IAdminAuditService auditService)
-        {
-            _statusService = statusService;
-            _queryService = queryService;
-            _auditService = auditService;
-        }
 
         [HttpGet]
         public async Task<IActionResult> GetOrders([FromQuery] AdminOrderFilterRequest request)
@@ -63,9 +60,10 @@ namespace AuraNova.API.Controllers
             try
             {
                 var result = await _statusService.ChangeStatusAsync(id, newStatus, request.Comment);
-                
-                await this.LogActionAsync(_auditService, "UpdateStatus", "Order", id.ToString(), $"Estado de pedido cambiado a '{newStatus}'.");
-                
+
+                await this.LogActionAsync(_auditService, "UpdateStatus", "Order", id.ToString(),
+                    $"Estado de pedido cambiado a '{newStatus}'.");
+
                 return Ok(result);
             }
             catch (OrderNotFoundException ex)
@@ -89,6 +87,84 @@ namespace AuraNova.API.Controllers
             catch (OrderNotFoundException ex)
             {
                 return NotFound(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("{id:guid}/start-preparation")]
+        public async Task<IActionResult> StartPreparation(Guid id)
+        {
+            try
+            {
+                await _orderService.StartPreparationAsync(id);
+                await this.LogActionAsync(_auditService, "StartPreparation", "Order", id.ToString(),
+                    "Elaboración iniciada.");
+                return Ok(new { message = "Elaboración iniciada correctamente." });
+            }
+            catch (OrderNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (OrderValidationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPatch("{id:guid}/estimated-date")]
+        public async Task<IActionResult> SetEstimatedDate(Guid id, [FromBody] SetEstimatedReadyDateRequest request)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            try
+            {
+                await _orderService.SetEstimatedReadyDateAsync(id, request.EstimatedDate);
+                await this.LogActionAsync(_auditService, "SetEstimatedDate", "Order", id.ToString(),
+                    $"Fecha estimada fijada: {request.EstimatedDate}");
+                return Ok(new { message = "Fecha estimada actualizada." });
+            }
+            catch (OrderNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("{id:guid}/mark-ready")]
+        public async Task<IActionResult> MarkReady(Guid id)
+        {
+            try
+            {
+                await _orderService.MarkAsReadyAsync(id);
+                await this.LogActionAsync(_auditService, "MarkReady", "Order", id.ToString(), "Pedido marcado como listo.");
+                return Ok(new { message = "Pedido marcado como listo." });
+            }
+            catch (OrderNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (OrderValidationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpPost("{id:guid}/deliver-to-agency")]
+        public async Task<IActionResult> DeliverToAgency(Guid id, [FromBody] DeliverToAgencyRequest request)
+        {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
+            try
+            {
+                await _orderService.DeliverToAgencyAsync(id, request.Provider, request.TrackingCode, request.ProofUrl);
+                await this.LogActionAsync(_auditService, "DeliverToAgency", "Order", id.ToString(), $"Entregado a agencia {request.Provider}.");
+                return Ok(new { message = "Entrega a agencia registrada." });
+            }
+            catch (OrderNotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (OrderValidationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
             }
         }
     }

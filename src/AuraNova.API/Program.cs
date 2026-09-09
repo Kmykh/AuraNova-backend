@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using AuraNova.Infrastructure.Persistence;
-using Microsoft.AspNetCore.RateLimiting;
 using AuraNova.API.Middlewares;
 using AuraNova.API.Configuration;
 using System.Text.Json.Serialization;

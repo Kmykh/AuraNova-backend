@@ -20,6 +20,7 @@ namespace AuraNova.Application.Dashboard.DTOs
         public int Preparing { get; set; }
         public int Ready { get; set; }
         public int Shipped { get; set; }
+        public int DeliveredToAgency { get; set; }
         public int Delivered { get; set; }
         public int Cancelled { get; set; }
     }

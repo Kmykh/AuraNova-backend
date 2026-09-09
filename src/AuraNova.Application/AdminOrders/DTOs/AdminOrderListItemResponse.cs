@@ -17,5 +17,7 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public bool IsCustomOrder { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
+        public DateTimeOffset? StartedAt { get; set; }
+        public DateTimeOffset? EstimatedReadyAt { get; set; }
     }
 }

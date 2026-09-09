@@ -1,5 +1,6 @@
 using AuraNova.Application.Orders.Interfaces;
 using AuraNova.Domain.Enums;
+using System.Collections.Generic;
 
 namespace AuraNova.Infrastructure.Orders
 {
@@ -16,9 +17,11 @@ namespace AuraNova.Infrastructure.Orders
             OrderStatus.Preparing
         ];
 
-        // Forward transitions for MeetingPoint (no Shipped)
+        // Forward transitions for MeetingPoint
         private static readonly Dictionary<OrderStatus, OrderStatus[]> MeetingPointTransitions = new()
         {
+            [OrderStatus.WaitingQuote]     = [OrderStatus.QuoteReady], // For Custom Orders
+            [OrderStatus.QuoteReady]       = [OrderStatus.WaitingPayment], // For Custom Orders
             [OrderStatus.WaitingPayment]   = [OrderStatus.PaymentReported],
             [OrderStatus.PaymentReported]  = [OrderStatus.PaymentConfirmed, OrderStatus.WaitingPayment],
             [OrderStatus.PaymentConfirmed] = [OrderStatus.Preparing],
@@ -26,9 +29,11 @@ namespace AuraNova.Infrastructure.Orders
             [OrderStatus.Ready]            = [OrderStatus.Delivered],
         };
 
-        // Forward transitions for Delivery (includes Shipped)
+        // Forward transitions for Delivery
         private static readonly Dictionary<OrderStatus, OrderStatus[]> DeliveryTransitions = new()
         {
+            [OrderStatus.WaitingQuote]     = [OrderStatus.QuoteReady], // For Custom Orders
+            [OrderStatus.QuoteReady]       = [OrderStatus.WaitingPayment], // For Custom Orders
             [OrderStatus.WaitingPayment]   = [OrderStatus.PaymentReported],
             [OrderStatus.PaymentReported]  = [OrderStatus.PaymentConfirmed, OrderStatus.WaitingPayment],
             [OrderStatus.PaymentConfirmed] = [OrderStatus.Preparing],
@@ -37,17 +42,17 @@ namespace AuraNova.Infrastructure.Orders
             [OrderStatus.Shipped]          = [OrderStatus.Delivered],
         };
 
-        // Forward transitions for NationalShipping (includes WaitingQuote → QuoteReady and Shipped)
+        // Forward transitions for NationalShipping
         private static readonly Dictionary<OrderStatus, OrderStatus[]> NationalShippingTransitions = new()
         {
-            [OrderStatus.WaitingQuote]     = [OrderStatus.QuoteReady],
-            [OrderStatus.QuoteReady]       = [OrderStatus.WaitingPayment],
+            [OrderStatus.WaitingQuote]     = [OrderStatus.QuoteReady], // For Custom Orders
+            [OrderStatus.QuoteReady]       = [OrderStatus.WaitingPayment], // For Custom Orders
             [OrderStatus.WaitingPayment]   = [OrderStatus.PaymentReported],
             [OrderStatus.PaymentReported]  = [OrderStatus.PaymentConfirmed, OrderStatus.WaitingPayment],
             [OrderStatus.PaymentConfirmed] = [OrderStatus.Preparing],
             [OrderStatus.Preparing]        = [OrderStatus.Ready],
-            [OrderStatus.Ready]            = [OrderStatus.Shipped],
-            [OrderStatus.Shipped]          = [OrderStatus.Delivered],
+            [OrderStatus.Ready]            = [OrderStatus.DeliveredToAgency],
+            [OrderStatus.DeliveredToAgency] = [OrderStatus.Delivered],
         };
 
         public bool IsTransitionAllowed(OrderStatus current, OrderStatus target, DeliveryType deliveryType)

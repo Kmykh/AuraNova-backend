@@ -77,7 +77,9 @@ namespace AuraNova.Infrastructure.Orders
                     Total = o.Total,
                     IsCustomOrder = o.IsCustomOrder,
                     CreatedAt = o.CreatedAt,
-                    UpdatedAt = o.UpdatedAt
+                    UpdatedAt = o.UpdatedAt,
+                    StartedAt = o.StartedAt,
+                    EstimatedReadyAt = o.EstimatedReadyAt
                 }).ToList();
 
             return new PagedResponse<AdminOrderListItemResponse>(items, totalItems, request.Page, request.PageSize);
@@ -116,6 +118,13 @@ namespace AuraNova.Infrastructure.Orders
                 IsCustomOrder = order.IsCustomOrder,
                 ReferenceImageUrl = order.ReferenceImageUrl,
                 CustomizationNotes = order.CustomizationNotes,
+                StartedAt = order.StartedAt,
+                EstimatedReadyAt = order.EstimatedReadyAt,
+                ReadyAt = order.ReadyAt,
+                DeliveredToAgencyAt = order.DeliveredToAgencyAt,
+                ShippingProvider = order.ShippingProvider,
+                ShippingTrackingCode = order.ShippingTrackingCode,
+                ShippingProofUrl = order.ShippingProofUrl,
                 Customer = new AdminOrderCustomer
                 {
                     Name = order.Customer?.Name ?? string.Empty,

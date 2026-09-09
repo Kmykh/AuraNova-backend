@@ -42,6 +42,17 @@ namespace AuraNova.Domain.Entities
 
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
+        
+        // Timing
+        public DateTimeOffset? StartedAt { get; set; }
+        public DateTimeOffset? EstimatedReadyAt { get; set; }
+        public DateTimeOffset? ReadyAt { get; set; }
+        public DateTimeOffset? DeliveredToAgencyAt { get; set; }
+
+        // Shipping (NationalShipping details)
+        public string? ShippingProvider { get; set; }
+        public string? ShippingTrackingCode { get; set; }
+        public string? ShippingProofUrl { get; set; }
 
         public ICollection<OrderItem>? Items { get; set; }
         public Quote? Quote { get; set; }

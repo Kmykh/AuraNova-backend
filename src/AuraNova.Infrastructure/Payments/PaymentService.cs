@@ -130,6 +130,18 @@ namespace AuraNova.Infrastructure.Payments
             return payments.Select(MapToAdminResponse).ToList();
         }
 
+        public async Task<IReadOnlyList<AdminPaymentResponse>> GetPendingAdminPaymentsAsync()
+        {
+            var payments = await _db.Payments
+                .Include(p => p.Order!)
+                    .ThenInclude(o => o.Customer)
+                .Where(p => p.Status == PaymentStatus.Reported)
+                .OrderByDescending(p => p.UpdatedAt)
+                .ToListAsync();
+
+            return payments.Select(MapToAdminResponse).ToList();
+        }
+
         public async Task<AdminPaymentResponse?> GetAdminPaymentByIdAsync(Guid paymentId)
         {
             var payment = await _db.Payments

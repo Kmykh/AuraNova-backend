@@ -28,6 +28,12 @@ namespace AuraNova.API.Controllers
             return Ok(await _paymentService.GetAdminPaymentsAsync());
         }
 
+        [HttpGet("pending")]
+        public async Task<IActionResult> GetPending()
+        {
+            return Ok(await _paymentService.GetPendingAdminPaymentsAsync());
+        }
+
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetById(Guid id)
         {

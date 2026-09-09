@@ -11,6 +11,7 @@ namespace AuraNova.Application.Payments.Interfaces
         PaymentInfoResponse GetPaymentInfo();
         Task<PaymentResponse> ReportEvidenceAsync(Guid orderId, Stream fileStream, string fileName, string contentType);
         Task<IReadOnlyList<AdminPaymentResponse>> GetAdminPaymentsAsync();
+        Task<IReadOnlyList<AdminPaymentResponse>> GetPendingAdminPaymentsAsync();
         Task<AdminPaymentResponse?> GetAdminPaymentByIdAsync(Guid paymentId);
         Task<bool> ConfirmAsync(Guid paymentId);
         Task<bool> RejectAsync(Guid paymentId, RejectPaymentRequest request);

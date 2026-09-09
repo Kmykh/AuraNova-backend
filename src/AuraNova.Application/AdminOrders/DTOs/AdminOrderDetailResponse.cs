@@ -21,6 +21,17 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public string? ReferenceImageUrl { get; set; }
         public string? CustomizationNotes { get; set; }
 
+        // Timing
+        public DateTimeOffset? StartedAt { get; set; }
+        public DateTimeOffset? EstimatedReadyAt { get; set; }
+        public DateTimeOffset? ReadyAt { get; set; }
+        public DateTimeOffset? DeliveredToAgencyAt { get; set; }
+
+        // Shipping
+        public string? ShippingProvider { get; set; }
+        public string? ShippingTrackingCode { get; set; }
+        public string? ShippingProofUrl { get; set; }
+
         public AdminOrderCustomer Customer { get; set; } = new();
         public AdminOrderDelivery Delivery { get; set; } = new();
         public AdminOrderQuote? Quote { get; set; }
