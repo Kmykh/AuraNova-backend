@@ -188,9 +188,11 @@ namespace AuraNova.Infrastructure.Orders
             {
                 response.Payment = new AdminOrderPayment
                 {
+                    Id = order.Payment.Id,
                     PaymentStatus = order.Payment.Status.ToString(),
                     PaymentMethod = order.Payment.Method.ToString(),
                     Amount = order.Payment.Amount,
+                    EvidenceUrl = order.Payment.EvidenceUrl,
                     CreatedAt = order.Payment.CreatedAt,
                     VerifiedAt = order.Payment.VerifiedAt
                 };

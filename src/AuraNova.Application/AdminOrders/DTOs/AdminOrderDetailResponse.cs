@@ -70,9 +70,11 @@ namespace AuraNova.Application.AdminOrders.DTOs
 
     public class AdminOrderPayment
     {
+        public Guid Id { get; set; }
         public string PaymentStatus { get; set; } = string.Empty;
         public string PaymentMethod { get; set; } = string.Empty;
         public decimal Amount { get; set; }
+        public string? EvidenceUrl { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? VerifiedAt { get; set; }
     }
