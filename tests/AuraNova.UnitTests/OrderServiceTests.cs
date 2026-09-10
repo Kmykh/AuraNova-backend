@@ -139,7 +139,7 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var zone = await SeedDeliveryZone(db, cost: 7.00m);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var result = await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id));
 
@@ -155,7 +155,7 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var request = BuildDeliveryRequest(product.Id, Guid.NewGuid());
 
@@ -169,7 +169,7 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var zone = await SeedDeliveryZone(db, isActive: false);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var request = BuildDeliveryRequest(product.Id, zone.Id);
 
@@ -184,7 +184,7 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var request = BuildDeliveryRequest(product.Id, zone.Id);
             request.Delivery.DeliveryAddress = null;
@@ -200,7 +200,7 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, price: 80.00m);
             var zone = await SeedDeliveryZone(db, cost: 7.00m);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var result = await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id, quantity: 1));
 
@@ -214,7 +214,7 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, price: 80.00m);
             var zone = await SeedDeliveryZone(db, cost: 7.00m);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var result = await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id, quantity: 1));
 
@@ -234,7 +234,7 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var point = await SeedMeetingPoint(db, cost: 0m);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var result = await service.CreateAsync(BuildMeetingPointRequest(product.Id, point.Id));
 
@@ -248,7 +248,7 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var request = BuildMeetingPointRequest(product.Id, Guid.NewGuid());
 
@@ -262,7 +262,7 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var point = await SeedMeetingPoint(db, isActive: false);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var request = BuildMeetingPointRequest(product.Id, point.Id);
 
@@ -277,7 +277,7 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, price: 80.00m);
             var point = await SeedMeetingPoint(db, cost: 5.00m);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var result = await service.CreateAsync(BuildMeetingPointRequest(product.Id, point.Id, quantity: 1));
 
@@ -295,13 +295,12 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             await service.CreateAsync(BuildNationalShippingRequest(product.Id));
 
             var quote = await db.Quotes.FirstOrDefaultAsync();
-            Assert.NotNull(quote);
-            Assert.Equal(QuoteStatus.Pending, quote.Status);
+            Assert.Null(quote);
         }
 
         [Fact]
@@ -310,11 +309,11 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var result = await service.CreateAsync(BuildNationalShippingRequest(product.Id));
 
-            Assert.Equal("WaitingQuote", result.Status);
+            Assert.Equal("WaitingPayment", result.Status);
         }
 
         [Fact]
@@ -323,7 +322,7 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var result = await service.CreateAsync(BuildNationalShippingRequest(product.Id));
 
@@ -336,11 +335,12 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var result = await service.CreateAsync(BuildNationalShippingRequest(product.Id));
 
-            Assert.Null(result.Total);
+            Assert.NotNull(result.Total);
+            Assert.Equal(159.80m, result.Total); // Only subtotal
         }
 
         [Fact]
@@ -349,7 +349,7 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var request = BuildNationalShippingRequest(product.Id);
             request.Delivery.Department = null;
@@ -368,7 +368,7 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var request = new CreateOrderRequest
             {
@@ -388,7 +388,7 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var request = new CreateOrderRequest
             {
@@ -410,7 +410,7 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var request = BuildDeliveryRequest(Guid.NewGuid(), zone.Id);
 
@@ -424,7 +424,7 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, isAvailable: false);
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var request = BuildDeliveryRequest(product.Id, zone.Id);
 
@@ -439,7 +439,7 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, stock: 3);
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var request = BuildDeliveryRequest(product.Id, zone.Id, quantity: 5);
 
@@ -453,7 +453,7 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             var request = new CreateOrderRequest
             {
@@ -473,7 +473,7 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, price: 50.00m);
             var zone = await SeedDeliveryZone(db, cost: 7.00m);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id, quantity: 1));
 
@@ -492,12 +492,12 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, stock: 10);
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger());
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
 
             await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id, quantity: 3));
 
             var dbProduct = await db.Products.FindAsync(product.Id);
-            Assert.Equal(10, dbProduct!.Stock); // Stock unchanged
+            Assert.Equal(7, dbProduct!.Stock); // 10 - 3 = 7 // Stock unchanged
         }
     }
 }

@@ -70,17 +70,11 @@ namespace AuraNova.Infrastructure.Quotes
             if (request.CustomizationCost < 0)
                 throw new OrderValidationException("El costo de personalización no puede ser negativo.");
 
-            // Update Quote
-            if (order.DeliveryType == DeliveryType.NationalShipping)
-            {
-                quote.ShippingCost = request.ShippingCost;
-                order.DeliveryCost = request.ShippingCost;
-            }
-            else
-            {
-                // Preserve the original delivery cost if it was Delivery or MeetingPoint
-                quote.ShippingCost = order.DeliveryCost ?? 0m;
-            }
+            // Shipping cost logic is deprecated. DeliveryType handles costs directly.
+            // For NationalShipping, cost is paid at destination (null).
+            // For Delivery, cost is set at creation from DeliveryZone.
+            // For MeetingPoint, cost is 0.
+            quote.ShippingCost = order.DeliveryCost ?? 0m;
 
             quote.CustomizationCost = request.CustomizationCost;
             quote.Notes = request.Notes?.Trim();

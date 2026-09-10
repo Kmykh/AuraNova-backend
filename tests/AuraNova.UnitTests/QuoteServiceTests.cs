@@ -36,11 +36,12 @@ namespace AuraNova.UnitTests
                 CustomerId = customer.Id,
                 Customer = customer,
                 OrderCode = "PED-2026-000001",
-                DeliveryType = DeliveryType.NationalShipping,
+                DeliveryType = DeliveryType.Delivery,
                 Subtotal = 80.00m,
-                DeliveryCost = null,
+                DeliveryCost = 15.00m,
                 Total = null,
                 Status = OrderStatus.WaitingQuote,
+                IsCustomOrder = true,
                 Department = "Lima",
                 Province = "Lima",
                 District = "Miraflores"
@@ -64,13 +65,14 @@ namespace AuraNova.UnitTests
 
             var result = await service.UpdateAsync(quote.Id, new UpdateQuoteRequest
             {
-                ShippingCost = 20.00m,
-                Notes = "Envío por Cruz del Sur"
+                CustomizationCost = 20.00m,
+                Notes = "Personalización"
             });
 
             Assert.Equal("Ready", result.Status);
-            Assert.Equal(20.00m, result.ShippingCost);
-            Assert.Equal(100.00m, result.Total);
+            Assert.Equal(15.00m, result.ShippingCost); // Preserved from order
+            Assert.Equal(20.00m, result.CustomizationCost);
+            Assert.Equal(115.00m, result.Total); // 80 + 15 + 20
         }
 
         [Fact]
@@ -109,12 +111,13 @@ namespace AuraNova.UnitTests
             var notificationService = new Mock<INotificationService>();
             var service = new QuoteService(db, notificationService.Object, new NullLogger<QuoteService>());
 
-            await service.UpdateAsync(quote.Id, new UpdateQuoteRequest { ShippingCost = 20.00m });
+            await service.UpdateAsync(quote.Id, new UpdateQuoteRequest { CustomizationCost = 20.00m });
 
             var dbOrder = await db.Orders.FindAsync(order.Id);
             Assert.Equal(OrderStatus.QuoteReady, dbOrder!.Status);
-            Assert.Equal(20.00m, dbOrder.DeliveryCost);
-            Assert.Equal(100.00m, dbOrder.Total);
+            Assert.Equal(15.00m, dbOrder.DeliveryCost);
+            Assert.Equal(20.00m, dbOrder.CustomizationCost);
+            Assert.Equal(115.00m, dbOrder.Total);
         }
 
 

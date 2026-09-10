@@ -8,6 +8,7 @@ using AuraNova.Domain.Enums;
 using AuraNova.Infrastructure.Notifications;
 using AuraNova.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
@@ -55,7 +56,8 @@ namespace AuraNova.UnitTests
             whatsAppService.Setup(s => s.NormalizePhone(It.IsAny<string>())).Returns("51999999999");
             whatsAppService.Setup(s => s.GenerateUrlAsync(It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync("https://wa.me/test");
 
-            var service = new NotificationService(db, templateService.Object, whatsAppService.Object, new NullLogger<NotificationService>());
+            var mockConfig = new Mock<IConfiguration>();
+            var service = new NotificationService(db, templateService.Object, whatsAppService.Object, new NullLogger<NotificationService>(), mockConfig.Object);
 
             await service.NotifyAsync(order.Id, NotificationType.OrderPreparing);
 
@@ -75,7 +77,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var templateService = new Mock<INotificationTemplateService>();
             var whatsAppService = new Mock<IWhatsAppMessageService>();
-            var service = new NotificationService(db, templateService.Object, whatsAppService.Object, new NullLogger<NotificationService>());
+            var mockConfig = new Mock<IConfiguration>();
+            var service = new NotificationService(db, templateService.Object, whatsAppService.Object, new NullLogger<NotificationService>(), mockConfig.Object);
 
             // Should complete without throwing exceptions
             await service.NotifyAsync(Guid.NewGuid(), NotificationType.OrderCreated);
@@ -101,7 +104,8 @@ namespace AuraNova.UnitTests
 
             var templateService = new Mock<INotificationTemplateService>();
             var whatsAppService = new Mock<IWhatsAppMessageService>();
-            var service = new NotificationService(db, templateService.Object, whatsAppService.Object, new NullLogger<NotificationService>());
+            var mockConfig = new Mock<IConfiguration>();
+            var service = new NotificationService(db, templateService.Object, whatsAppService.Object, new NullLogger<NotificationService>(), mockConfig.Object);
 
             await service.NotifyAsync(order.Id, NotificationType.PaymentConfirmed);
 

@@ -29,8 +29,7 @@ namespace AuraNova.API.Controllers
                 {
                     holderName = settings.YapeHolderName,
                     qrImageUrl = settings.YapeQrImageUrl
-                },
-                trackingBaseUrl = settings.TrackingBaseUrl
+                }
             });
         }
     }

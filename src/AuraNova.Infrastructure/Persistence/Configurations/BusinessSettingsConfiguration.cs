@@ -22,10 +22,6 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
                 .IsRequired()
                 .HasMaxLength(150);
 
-            builder.Property(x => x.TrackingBaseUrl)
-                .IsRequired()
-                .HasMaxLength(500);
-
             builder.Property(x => x.YapeQrImageUrl)
                 .HasMaxLength(500);
         }

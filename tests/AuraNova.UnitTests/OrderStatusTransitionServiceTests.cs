@@ -17,7 +17,8 @@ namespace AuraNova.UnitTests
         [InlineData(OrderStatus.PaymentReported, OrderStatus.WaitingPayment, DeliveryType.Delivery)] // Rejection
         [InlineData(OrderStatus.PaymentConfirmed, OrderStatus.Preparing, DeliveryType.Delivery)]
         [InlineData(OrderStatus.Preparing, OrderStatus.Ready, DeliveryType.Delivery)]
-        [InlineData(OrderStatus.Ready, OrderStatus.Delivered, DeliveryType.Delivery)]
+        [InlineData(OrderStatus.Ready, OrderStatus.Shipped, DeliveryType.Delivery)]
+        [InlineData(OrderStatus.Shipped, OrderStatus.Delivered, DeliveryType.Delivery)]
         [InlineData(OrderStatus.Ready, OrderStatus.Delivered, DeliveryType.MeetingPoint)]
         public void IsTransitionAllowed_ValidDeliveryTransitions_ShouldReturnTrue(
             OrderStatus current, OrderStatus target, DeliveryType deliveryType)
@@ -31,8 +32,8 @@ namespace AuraNova.UnitTests
         [InlineData(OrderStatus.WaitingPayment, OrderStatus.PaymentReported)]
         [InlineData(OrderStatus.PaymentConfirmed, OrderStatus.Preparing)]
         [InlineData(OrderStatus.Preparing, OrderStatus.Ready)]
-        [InlineData(OrderStatus.Ready, OrderStatus.Shipped)]
-        [InlineData(OrderStatus.Shipped, OrderStatus.Delivered)]
+        [InlineData(OrderStatus.Ready, OrderStatus.DeliveredToAgency)]
+        [InlineData(OrderStatus.DeliveredToAgency, OrderStatus.Delivered)]
         public void IsTransitionAllowed_ValidNationalShippingTransitions_ShouldReturnTrue(
             OrderStatus current, OrderStatus target)
         {
@@ -105,11 +106,11 @@ namespace AuraNova.UnitTests
         // ===================== DELIVERY TYPE SPECIFIC =====================
 
         [Fact]
-        public void IsTransitionAllowed_ReadyToShipped_OnlyForNationalShipping()
+        public void IsTransitionAllowed_ReadyToDeliveredToAgency_OnlyForNationalShipping()
         {
-            Assert.True(_sut.IsTransitionAllowed(OrderStatus.Ready, OrderStatus.Shipped, DeliveryType.NationalShipping));
-            Assert.False(_sut.IsTransitionAllowed(OrderStatus.Ready, OrderStatus.Shipped, DeliveryType.Delivery));
-            Assert.False(_sut.IsTransitionAllowed(OrderStatus.Ready, OrderStatus.Shipped, DeliveryType.MeetingPoint));
+            Assert.True(_sut.IsTransitionAllowed(OrderStatus.Ready, OrderStatus.DeliveredToAgency, DeliveryType.NationalShipping));
+            Assert.False(_sut.IsTransitionAllowed(OrderStatus.Ready, OrderStatus.DeliveredToAgency, DeliveryType.Delivery));
+            Assert.False(_sut.IsTransitionAllowed(OrderStatus.Ready, OrderStatus.DeliveredToAgency, DeliveryType.MeetingPoint));
         }
     }
 }

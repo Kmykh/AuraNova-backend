@@ -107,7 +107,7 @@ namespace AuraNova.UnitTests
         }
 
         [Fact]
-        public async Task ChangeStatusAsync_ShippedOnlyForNationalShipping_ShouldRejectForDelivery()
+        public async Task ChangeStatusAsync_DeliveredToAgencyOnlyForNationalShipping_ShouldRejectForDelivery()
         {
             using var db = GetInMemoryDb();
             var order = await SeedOrder(db, OrderStatus.Ready, DeliveryType.Delivery);
@@ -116,7 +116,7 @@ namespace AuraNova.UnitTests
             var service = new OrderStatusService(db, transitions, notificationService.Object, new NullLogger<OrderStatusService>());
 
             var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
-                service.ChangeStatusAsync(order.Id, OrderStatus.Shipped, null));
+                service.ChangeStatusAsync(order.Id, OrderStatus.DeliveredToAgency, null));
             Assert.Contains("Transición inválida", ex.Message);
         }
 

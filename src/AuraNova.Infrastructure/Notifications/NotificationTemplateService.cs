@@ -8,17 +8,14 @@ namespace AuraNova.Infrastructure.Notifications
 {
     public class NotificationTemplateService : INotificationTemplateService
     {
-        private readonly ITrackingUrlService _trackingUrlService;
         private readonly IBusinessSettingsService _settingsService;
 
-        public NotificationTemplateService(ITrackingUrlService trackingUrlService, IBusinessSettingsService settingsService)
+        public NotificationTemplateService(IBusinessSettingsService settingsService)
         {
-            _trackingUrlService = trackingUrlService;
             _settingsService = settingsService;
         }
 
         private string GetName(Order order) => order.Customer?.Name ?? "Cliente";
-        private async Task<string> GetTrackingAsync(Order order) => await _trackingUrlService.GenerateTrackingUrlAsync(order);
         private async Task<string> GetBusinessNameAsync() 
         {
             var settings = await _settingsService.GetPublicAsync();
@@ -30,7 +27,6 @@ namespace AuraNova.Infrastructure.Notifications
             var isQuote = order.DeliveryType == DeliveryType.NationalShipping;
             var isCustom = order.IsCustomOrder;
             var businessName = await GetBusinessNameAsync();
-            var tracking = await GetTrackingAsync(order);
 
             if (isCustom)
             {
@@ -87,7 +83,6 @@ namespace AuraNova.Infrastructure.Notifications
             var subtotal = order.Subtotal;
             var total = subtotal + shippingCost + customCost;
             var businessName = await GetBusinessNameAsync();
-            var tracking = await GetTrackingAsync(order);
 
             if (order.IsCustomOrder)
             {
@@ -125,7 +120,6 @@ namespace AuraNova.Infrastructure.Notifications
 
         public async Task<string> BuildPaymentReportedMessageAsync(Order order)
         {
-            var tracking = await GetTrackingAsync(order);
             return $"""
                 Hola {GetName(order)}
                 
@@ -141,7 +135,6 @@ namespace AuraNova.Infrastructure.Notifications
         public async Task<string> BuildPaymentConfirmedMessageAsync(Order order)
         {
             var businessName = await GetBusinessNameAsync();
-            var tracking = await GetTrackingAsync(order);
             return $"""
                 Hola {GetName(order)}
                 
@@ -158,7 +151,6 @@ namespace AuraNova.Infrastructure.Notifications
 
         public async Task<string> BuildPaymentRejectedMessageAsync(Order order, string? reason)
         {
-            var tracking = await GetTrackingAsync(order);
             return $"""
                 Hola {GetName(order)}
                 
@@ -176,7 +168,6 @@ namespace AuraNova.Infrastructure.Notifications
 
         public async Task<string> BuildPreparingMessageAsync(Order order)
         {
-            var tracking = await GetTrackingAsync(order);
             return $"""
                 Hola {GetName(order)}
                 
@@ -191,7 +182,6 @@ namespace AuraNova.Infrastructure.Notifications
 
         public async Task<string> BuildReadyMessageAsync(Order order)
         {
-            var tracking = await GetTrackingAsync(order);
             if (order.DeliveryType == DeliveryType.Delivery)
             {
                 return $"""
@@ -220,7 +210,6 @@ namespace AuraNova.Infrastructure.Notifications
 
         public async Task<string> BuildShippedMessageAsync(Order order)
         {
-            var tracking = await GetTrackingAsync(order);
             return $"""
                 Hola {GetName(order)}
                 
@@ -234,7 +223,6 @@ namespace AuraNova.Infrastructure.Notifications
         public async Task<string> BuildDeliveredMessageAsync(Order order)
         {
             var businessName = await GetBusinessNameAsync();
-            var tracking = await GetTrackingAsync(order);
             return $"""
                 Hola {GetName(order)}
                 

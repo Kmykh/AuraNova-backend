@@ -128,7 +128,6 @@ builder.Services.AddScoped<AuraNova.Application.Orders.Interfaces.IOrderTracking
 
 
 // register notification services
-builder.Services.AddScoped<AuraNova.Application.Notifications.Interfaces.ITrackingUrlService, AuraNova.Infrastructure.Notifications.TrackingUrlService>();
 builder.Services.AddScoped<AuraNova.Application.Notifications.Interfaces.INotificationTemplateService, AuraNova.Infrastructure.Notifications.NotificationTemplateService>();
 builder.Services.AddScoped<AuraNova.Application.Notifications.Interfaces.INotificationService, AuraNova.Infrastructure.Notifications.NotificationService>();
 

@@ -4,6 +4,7 @@ using AuraNova.Application.AdminOrders.Interfaces;
 using AuraNova.Application.Audit.Interfaces;
 using AuraNova.Application.Orders.DTOs;
 using AuraNova.Application.Orders.Interfaces;
+using AuraNova.Application.Storage.Interfaces;
 using AuraNova.Domain.Enums;
 using AuraNova.Infrastructure.Orders;
 using Microsoft.AspNetCore.Authorization;
@@ -20,12 +21,14 @@ namespace AuraNova.API.Controllers
         IOrderStatusService statusService,
         IAdminOrderQueryService queryService,
         IAdminAuditService auditService,
-        IOrderService orderService) : ControllerBase
+        IOrderService orderService,
+        IFileStorageService storageService) : ControllerBase
     {
         private readonly IOrderStatusService _statusService = statusService;
         private readonly IAdminOrderQueryService _queryService = queryService;
         private readonly IAdminAuditService _auditService = auditService;
         private readonly IOrderService _orderService = orderService;
+        private readonly IFileStorageService _storageService = storageService;
 
 
         [HttpGet]
@@ -148,14 +151,23 @@ namespace AuraNova.API.Controllers
         }
 
         [HttpPost("{id:guid}/deliver-to-agency")]
-        public async Task<IActionResult> DeliverToAgency(Guid id, [FromBody] DeliverToAgencyRequest request)
+        public async Task<IActionResult> DeliverToAgency(Guid id, [FromForm] string provider, [FromForm] string trackingCode, IFormFile? proofFile)
         {
-            if (!ModelState.IsValid) return BadRequest(ModelState);
+            if (string.IsNullOrWhiteSpace(provider))
+                return BadRequest(new { message = "El proveedor de envío es obligatorio." });
 
             try
             {
-                await _orderService.DeliverToAgencyAsync(id, request.Provider, request.TrackingCode, request.ProofUrl);
-                await this.LogActionAsync(_auditService, "DeliverToAgency", "Order", id.ToString(), $"Entregado a agencia {request.Provider}.");
+                string? proofUrl = null;
+                if (proofFile != null && proofFile.Length > 0)
+                {
+                    // Upload file using Storage Service
+                    using var stream = proofFile.OpenReadStream();
+                    proofUrl = await _storageService.UploadAsync(stream, proofFile.FileName, proofFile.ContentType, "shipping-evidence");
+                }
+
+                await _orderService.DeliverToAgencyAsync(id, provider, trackingCode, proofUrl);
+                await this.LogActionAsync(_auditService, "DeliverToAgency", "Order", id.ToString(), $"Entregado a agencia {provider}.");
                 return Ok(new { message = "Entrega a agencia registrada." });
             }
             catch (OrderNotFoundException ex)
@@ -165,6 +177,10 @@ namespace AuraNova.API.Controllers
             catch (OrderValidationException ex)
             {
                 return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error al procesar la entrega a agencia.", details = ex.Message });
             }
         }
     }

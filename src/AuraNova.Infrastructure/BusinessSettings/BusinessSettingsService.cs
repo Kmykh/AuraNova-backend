@@ -32,7 +32,6 @@ namespace AuraNova.Infrastructure.BusinessSettings
                     BusinessName = "Aura Nova",
                     WhatsAppNumber = "",
                     YapeHolderName = "",
-                    TrackingBaseUrl = "",
                     CreatedAt = DateTimeOffset.UtcNow
                 };
                 _db.BusinessSettings.Add(settings);
@@ -61,13 +60,6 @@ namespace AuraNova.Infrastructure.BusinessSettings
                 throw new ArgumentException("WhatsAppNumber is required.");
             if (string.IsNullOrWhiteSpace(request.YapeHolderName))
                 throw new ArgumentException("YapeHolderName is required.");
-            if (string.IsNullOrWhiteSpace(request.TrackingBaseUrl))
-                throw new ArgumentException("TrackingBaseUrl is required.");
-
-            // Normalize tracking URL (no trailing slash)
-            var trackingUrl = request.TrackingBaseUrl.TrimEnd('/');
-            if (!Uri.TryCreate(trackingUrl, UriKind.Absolute, out _))
-                throw new ArgumentException("TrackingBaseUrl must be a valid URL.");
 
             // Normalize WhatsApp
             var normalizedPhone = new string(request.WhatsAppNumber.Where(char.IsDigit).ToArray());
@@ -81,7 +73,6 @@ namespace AuraNova.Infrastructure.BusinessSettings
             settings.BusinessName = request.BusinessName.Trim();
             settings.WhatsAppNumber = normalizedPhone;
             settings.YapeHolderName = request.YapeHolderName.Trim();
-            settings.TrackingBaseUrl = trackingUrl;
             settings.UpdatedAt = DateTimeOffset.UtcNow;
 
             await _db.SaveChangesAsync();
@@ -159,7 +150,6 @@ namespace AuraNova.Infrastructure.BusinessSettings
                 WhatsAppNumber = settings.WhatsAppNumber,
                 YapeHolderName = settings.YapeHolderName,
                 YapeQrImageUrl = settings.YapeQrImageUrl,
-                TrackingBaseUrl = settings.TrackingBaseUrl,
                 UpdatedAt = settings.UpdatedAt
             };
         }
