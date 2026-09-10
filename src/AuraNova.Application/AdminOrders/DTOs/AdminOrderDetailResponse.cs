@@ -102,6 +102,7 @@ namespace AuraNova.Application.AdminOrders.DTOs
     {
         public string Status { get; set; } = string.Empty;
         public string? Comment { get; set; }
+        public string? AdminName { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
     }
 

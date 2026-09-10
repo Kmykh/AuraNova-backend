@@ -161,6 +161,7 @@ namespace AuraNova.Infrastructure.Orders
                 {
                     Status = h.Status.ToString(),
                     Comment = h.Comment,
+                    AdminName = h.AdminName,
                     CreatedAt = h.CreatedAt
                 }).ToList() ?? new List<AdminOrderStatusHistory>(),
                 Notifications = order.Notifications?.OrderByDescending(n => n.CreatedAt).Select(n => new AdminOrderNotification

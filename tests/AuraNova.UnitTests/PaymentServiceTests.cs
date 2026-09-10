@@ -13,6 +13,7 @@ using AuraNova.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using AuraNova.Application.Auth.Interfaces;
 using Moq;
 using Xunit;
 
@@ -45,7 +46,8 @@ namespace AuraNova.UnitTests
         {
             var options = Options.Create(new PaymentSettings { YapeEnabled = true, YapeHolderName = "Test" });
             var notificationService = new Mock<INotificationService>();
-            return new PaymentService(db, new FakeStorageService(), notificationService.Object, options, new NullLogger<PaymentService>());
+            var currentUserService = new Mock<ICurrentUserService>();
+            return new PaymentService(db, new FakeStorageService(), notificationService.Object, options, currentUserService.Object, new NullLogger<PaymentService>());
         }
 
         private async Task<(Order order, Payment payment)> SeedWaitingPaymentOrder(AppDbContext db)

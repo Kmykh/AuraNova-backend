@@ -6,6 +6,7 @@ using AuraNova.Infrastructure.Orders;
 using AuraNova.Infrastructure.Persistence;
 using AuraNova.Infrastructure.Quotes;
 using AuraNova.Infrastructure.WhatsApp;
+using AuraNova.Application.Auth.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -61,7 +62,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var (order, quote) = await SeedOrderWithQuote(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new QuoteService(db, notificationService.Object, new NullLogger<QuoteService>());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>());
 
             var result = await service.UpdateAsync(quote.Id, new UpdateQuoteRequest
             {
@@ -81,7 +83,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var (_, quote) = await SeedOrderWithQuote(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new QuoteService(db, notificationService.Object, new NullLogger<QuoteService>());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>());
 
             var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
                 service.UpdateAsync(quote.Id, new UpdateQuoteRequest { ShippingCost = -5.00m }));
@@ -94,7 +97,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var (_, quote) = await SeedOrderWithQuote(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new QuoteService(db, notificationService.Object, new NullLogger<QuoteService>());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>());
 
             await service.UpdateAsync(quote.Id, new UpdateQuoteRequest { ShippingCost = 15.00m });
 
@@ -109,7 +113,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var (order, quote) = await SeedOrderWithQuote(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new QuoteService(db, notificationService.Object, new NullLogger<QuoteService>());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>());
 
             await service.UpdateAsync(quote.Id, new UpdateQuoteRequest { CustomizationCost = 20.00m });
 
@@ -132,7 +137,8 @@ namespace AuraNova.UnitTests
             await db.SaveChangesAsync();
 
             var notificationService = new Mock<INotificationService>();
-            var service = new QuoteService(db, notificationService.Object, new NullLogger<QuoteService>());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>());
 
             var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
                 service.UpdateAsync(quote.Id, new UpdateQuoteRequest { ShippingCost = 20.00m }));

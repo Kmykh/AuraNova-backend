@@ -23,6 +23,7 @@ namespace AuraNova.Infrastructure.Payments
         private readonly IFileStorageService _storageService;
         private readonly INotificationService _notificationService;
         private readonly PaymentSettings _settings;
+        private readonly AuraNova.Application.Auth.Interfaces.ICurrentUserService _currentUserService;
         private readonly ILogger<PaymentService> _logger;
 
         private const int MaxFileSizeMB = 5;
@@ -35,12 +36,14 @@ namespace AuraNova.Infrastructure.Payments
             IFileStorageService storageService,
             INotificationService notificationService,
             IOptions<PaymentSettings> options,
+            AuraNova.Application.Auth.Interfaces.ICurrentUserService currentUserService,
             ILogger<PaymentService> logger)
         {
             _db = db;
             _storageService = storageService;
             _notificationService = notificationService;
             _settings = options.Value;
+            _currentUserService = currentUserService;
             _logger = logger;
         }
 
@@ -177,7 +180,9 @@ namespace AuraNova.Infrastructure.Payments
             {
                 OrderId = payment.OrderId,
                 Status = OrderStatus.PaymentConfirmed,
-                Comment = "Pago confirmado por administrador."
+                Comment = "Pago confirmado por administrador.",
+                AdminUserId = _currentUserService.UserId,
+                AdminName = _currentUserService.Name
             });
 
             await _db.SaveChangesAsync();
@@ -213,7 +218,9 @@ namespace AuraNova.Infrastructure.Payments
             {
                 OrderId = payment.OrderId,
                 Status = OrderStatus.WaitingPayment,
-                Comment = $"La evidencia de pago fue rechazada. Motivo: {request.Notes.Trim()}"
+                Comment = $"La evidencia de pago fue rechazada. Motivo: {request.Notes.Trim()}",
+                AdminUserId = _currentUserService.UserId,
+                AdminName = _currentUserService.Name
             });
 
             await _db.SaveChangesAsync();

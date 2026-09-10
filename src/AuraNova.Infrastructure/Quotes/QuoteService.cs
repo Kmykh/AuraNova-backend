@@ -15,11 +15,13 @@ namespace AuraNova.Infrastructure.Quotes
         private readonly AppDbContext _db;
         private readonly INotificationService _notificationService;
         private readonly ILogger<QuoteService> _logger;
+        private readonly AuraNova.Application.Auth.Interfaces.ICurrentUserService _currentUserService;
 
-        public QuoteService(AppDbContext db, INotificationService notificationService, ILogger<QuoteService> logger)
+        public QuoteService(AppDbContext db, INotificationService notificationService, AuraNova.Application.Auth.Interfaces.ICurrentUserService currentUserService, ILogger<QuoteService> logger)
         {
             _db = db;
             _notificationService = notificationService;
+            _currentUserService = currentUserService;
             _logger = logger;
         }
 
@@ -92,7 +94,9 @@ namespace AuraNova.Infrastructure.Quotes
             {
                 OrderId = order.Id,
                 Status = OrderStatus.QuoteReady,
-                Comment = $"Cotización lista. Envío: S/ {(order.DeliveryCost ?? 0m):F2}"
+                Comment = $"Cotización lista. Envío: S/ {(order.DeliveryCost ?? 0m):F2}",
+                AdminUserId = _currentUserService.UserId,
+                AdminName = _currentUserService.Name
             });
 
             await _db.SaveChangesAsync();

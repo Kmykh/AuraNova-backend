@@ -4,6 +4,7 @@ using AuraNova.Domain.Enums;
 using AuraNova.Infrastructure.Orders;
 using AuraNova.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using AuraNova.Application.Auth.Interfaces;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -51,7 +52,8 @@ namespace AuraNova.UnitTests
             var order = await SeedOrder(db, OrderStatus.PaymentConfirmed);
             var transitions = new OrderStatusTransitionService();
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderStatusService(db, transitions, notificationService.Object, new NullLogger<OrderStatusService>());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderStatusService(db, transitions, notificationService.Object, currentUserService.Object, new NullLogger<OrderStatusService>());
 
             var result = await service.ChangeStatusAsync(order.Id, OrderStatus.Preparing, "Comenzamos a preparar.");
 
@@ -74,7 +76,8 @@ namespace AuraNova.UnitTests
             var order = await SeedOrder(db, OrderStatus.WaitingPayment);
             var transitions = new OrderStatusTransitionService();
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderStatusService(db, transitions, notificationService.Object, new NullLogger<OrderStatusService>());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderStatusService(db, transitions, notificationService.Object, currentUserService.Object, new NullLogger<OrderStatusService>());
 
             var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
                 service.ChangeStatusAsync(order.Id, OrderStatus.Delivered, null));
@@ -87,7 +90,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var transitions = new OrderStatusTransitionService();
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderStatusService(db, transitions, notificationService.Object, new NullLogger<OrderStatusService>());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderStatusService(db, transitions, notificationService.Object, currentUserService.Object, new NullLogger<OrderStatusService>());
 
             await Assert.ThrowsAsync<OrderNotFoundException>(() =>
                 service.ChangeStatusAsync(Guid.NewGuid(), OrderStatus.Preparing, null));
@@ -100,7 +104,8 @@ namespace AuraNova.UnitTests
             var order = await SeedOrder(db, OrderStatus.Preparing);
             var transitions = new OrderStatusTransitionService();
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderStatusService(db, transitions, notificationService.Object, new NullLogger<OrderStatusService>());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderStatusService(db, transitions, notificationService.Object, currentUserService.Object, new NullLogger<OrderStatusService>());
 
             var result = await service.ChangeStatusAsync(order.Id, OrderStatus.Cancelled, "Cliente solicitó cancelación.");
             Assert.Equal("Cancelled", result.Status);
@@ -113,7 +118,8 @@ namespace AuraNova.UnitTests
             var order = await SeedOrder(db, OrderStatus.Ready, DeliveryType.Delivery);
             var transitions = new OrderStatusTransitionService();
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderStatusService(db, transitions, notificationService.Object, new NullLogger<OrderStatusService>());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderStatusService(db, transitions, notificationService.Object, currentUserService.Object, new NullLogger<OrderStatusService>());
 
             var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
                 service.ChangeStatusAsync(order.Id, OrderStatus.DeliveredToAgency, null));
@@ -127,7 +133,8 @@ namespace AuraNova.UnitTests
             var order = await SeedOrder(db, OrderStatus.PaymentConfirmed);
             var transitions = new OrderStatusTransitionService();
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderStatusService(db, transitions, notificationService.Object, new NullLogger<OrderStatusService>());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderStatusService(db, transitions, notificationService.Object, currentUserService.Object, new NullLogger<OrderStatusService>());
 
             await service.ChangeStatusAsync(order.Id, OrderStatus.Preparing, null);
             await service.ChangeStatusAsync(order.Id, OrderStatus.Ready, null);

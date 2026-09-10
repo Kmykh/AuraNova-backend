@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using AuraNova.Application.Auth.Interfaces;
 using AuraNova.Application.Notifications.Interfaces;
 using AuraNova.Application.Orders;
 using AuraNova.Application.Orders.DTOs;
@@ -19,17 +20,20 @@ namespace AuraNova.Infrastructure.Orders
         private readonly AppDbContext _db;
         private readonly IOrderStatusTransitionService _transitions;
         private readonly INotificationService _notificationService;
+        private readonly ICurrentUserService _currentUserService;
         private readonly ILogger<OrderStatusService> _logger;
 
         public OrderStatusService(
             AppDbContext db,
             IOrderStatusTransitionService transitions,
             INotificationService notificationService,
+            ICurrentUserService currentUserService,
             ILogger<OrderStatusService> logger)
         {
             _db = db;
             _transitions = transitions;
             _notificationService = notificationService;
+            _currentUserService = currentUserService;
             _logger = logger;
         }
 
@@ -76,7 +80,9 @@ namespace AuraNova.Infrastructure.Orders
                 {
                     OrderId = order.Id,
                     Status = newStatus,
-                    Comment = comment?.Trim()
+                    Comment = comment?.Trim(),
+                    AdminUserId = _currentUserService.UserId,
+                    AdminName = _currentUserService.Name
                 };
                 _db.Set<OrderStatusHistory>().Add(history);
 

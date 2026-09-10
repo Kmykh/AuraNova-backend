@@ -82,6 +82,10 @@ builder.Services.AddScoped<AuraNova.Application.Auth.Interfaces.IPasswordHasherS
 builder.Services.AddScoped<AuraNova.Application.Auth.Interfaces.IJwtService, AuraNova.Infrastructure.Auth.JwtService>();
 builder.Services.AddScoped<AuraNova.Application.Auth.Interfaces.IAuthService, AuraNova.Infrastructure.Auth.AuthService>();
 
+// --- User Context ---
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<AuraNova.Application.Auth.Interfaces.ICurrentUserService, AuraNova.Infrastructure.Auth.CurrentUserService>();
+
 // register product services
 builder.Services.AddScoped<AuraNova.Application.Products.Interfaces.IProductService, AuraNova.Infrastructure.Products.ProductService>();
 

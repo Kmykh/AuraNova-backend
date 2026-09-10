@@ -13,6 +13,9 @@ namespace AuraNova.Domain.Entities
         public string? Comment { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
 
+        public Guid? AdminUserId { get; set; }
+        public string? AdminName { get; set; }
+
         public OrderStatusHistory()
         {
             Id = Guid.NewGuid();

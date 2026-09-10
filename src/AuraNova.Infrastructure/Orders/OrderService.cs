@@ -13,12 +13,14 @@ namespace AuraNova.Infrastructure.Orders
         AppDbContext db,
         INotificationService notificationService,
         ILogger<OrderService> logger,
-        IOrderStatusTransitionService transitionService) : IOrderService
+        IOrderStatusTransitionService transitionService,
+        AuraNova.Application.Auth.Interfaces.ICurrentUserService currentUserService) : IOrderService
     {
         private readonly AppDbContext _db = db;
         private readonly INotificationService _notificationService = notificationService;
         private readonly ILogger<OrderService> _logger = logger;
         private readonly IOrderStatusTransitionService _transitionService = transitionService;
+        private readonly AuraNova.Application.Auth.Interfaces.ICurrentUserService _currentUserService = currentUserService;
 
 
         public async Task<CreateOrderResponse> CreateAsync(CreateOrderRequest request)
@@ -246,7 +248,9 @@ namespace AuraNova.Infrastructure.Orders
                 _db.Set<OrderStatusHistory>().Add(new OrderStatusHistory
                 {
                     OrderId = order.Id,
-                    Status = initialStatus
+                    Status = initialStatus,
+                    AdminUserId = _currentUserService.UserId,
+                    AdminName = _currentUserService.Name
                 });
 
                 await _db.SaveChangesAsync();
@@ -433,7 +437,9 @@ namespace AuraNova.Infrastructure.Orders
                 {
                     OrderId = order.Id,
                     Status = OrderStatus.WaitingQuote,
-                    Comment = "Pedido personalizado ingresado a cotización."
+                    Comment = "Pedido personalizado ingresado a cotización.",
+                    AdminUserId = _currentUserService.UserId,
+                    AdminName = _currentUserService.Name
                 });
 
                 await _db.SaveChangesAsync();
@@ -539,7 +545,9 @@ namespace AuraNova.Infrastructure.Orders
             {
                 OrderId = order.Id,
                 Status = OrderStatus.WaitingPayment,
-                Comment = "Cotización aceptada por el cliente."
+                Comment = "Cotización aceptada por el cliente.",
+                AdminUserId = _currentUserService.UserId,
+                AdminName = _currentUserService.Name
             });
 
             await _db.SaveChangesAsync();
@@ -565,7 +573,9 @@ namespace AuraNova.Infrastructure.Orders
             {
                 OrderId = order.Id,
                 Status = OrderStatus.Preparing,
-                Comment = "Elaboración iniciada"
+                Comment = "Elaboración iniciada",
+                AdminUserId = _currentUserService.UserId,
+                AdminName = _currentUserService.Name
             });
 
             await _db.SaveChangesAsync();
@@ -596,7 +606,9 @@ namespace AuraNova.Infrastructure.Orders
             {
                 OrderId = order.Id,
                 Status = OrderStatus.Ready,
-                Comment = "Pedido listo"
+                Comment = "Pedido listo",
+                AdminUserId = _currentUserService.UserId,
+                AdminName = _currentUserService.Name
             });
 
             await _db.SaveChangesAsync();
@@ -628,7 +640,9 @@ namespace AuraNova.Infrastructure.Orders
             {
                 OrderId = order.Id,
                 Status = OrderStatus.DeliveredToAgency,
-                Comment = $"Entregado a {provider} - Tracking: {trackingCode}"
+                Comment = $"Entregado a {provider} - Tracking: {trackingCode}",
+                AdminUserId = _currentUserService.UserId,
+                AdminName = _currentUserService.Name
             });
 
             await _db.SaveChangesAsync();
@@ -649,7 +663,9 @@ namespace AuraNova.Infrastructure.Orders
             {
                 OrderId = order.Id,
                 Status = OrderStatus.Cancelled,
-                Comment = $"Cancelado: {reason}"
+                Comment = $"Cancelado: {reason}",
+                AdminUserId = _currentUserService.UserId,
+                AdminName = _currentUserService.Name
             });
 
             await _db.SaveChangesAsync();

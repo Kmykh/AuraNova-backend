@@ -7,6 +7,7 @@ using AuraNova.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using AuraNova.Application.Auth.Interfaces;
 using Moq;
 
 
@@ -139,7 +140,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var zone = await SeedDeliveryZone(db, cost: 7.00m);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var result = await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id));
 
@@ -155,7 +157,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var request = BuildDeliveryRequest(product.Id, Guid.NewGuid());
 
@@ -169,7 +172,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var zone = await SeedDeliveryZone(db, isActive: false);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var request = BuildDeliveryRequest(product.Id, zone.Id);
 
@@ -184,7 +188,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var request = BuildDeliveryRequest(product.Id, zone.Id);
             request.Delivery.DeliveryAddress = null;
@@ -200,7 +205,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, price: 80.00m);
             var zone = await SeedDeliveryZone(db, cost: 7.00m);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var result = await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id, quantity: 1));
 
@@ -214,7 +220,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, price: 80.00m);
             var zone = await SeedDeliveryZone(db, cost: 7.00m);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var result = await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id, quantity: 1));
 
@@ -234,7 +241,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var point = await SeedMeetingPoint(db, cost: 0m);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var result = await service.CreateAsync(BuildMeetingPointRequest(product.Id, point.Id));
 
@@ -248,7 +256,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var request = BuildMeetingPointRequest(product.Id, Guid.NewGuid());
 
@@ -262,7 +271,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var point = await SeedMeetingPoint(db, isActive: false);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var request = BuildMeetingPointRequest(product.Id, point.Id);
 
@@ -277,7 +287,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, price: 80.00m);
             var point = await SeedMeetingPoint(db, cost: 5.00m);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var result = await service.CreateAsync(BuildMeetingPointRequest(product.Id, point.Id, quantity: 1));
 
@@ -295,7 +306,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             await service.CreateAsync(BuildNationalShippingRequest(product.Id));
 
@@ -309,7 +321,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var result = await service.CreateAsync(BuildNationalShippingRequest(product.Id));
 
@@ -322,7 +335,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var result = await service.CreateAsync(BuildNationalShippingRequest(product.Id));
 
@@ -335,7 +349,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var result = await service.CreateAsync(BuildNationalShippingRequest(product.Id));
 
@@ -349,7 +364,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var request = BuildNationalShippingRequest(product.Id);
             request.Delivery.Department = null;
@@ -368,7 +384,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var request = new CreateOrderRequest
             {
@@ -388,7 +405,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var request = new CreateOrderRequest
             {
@@ -410,7 +428,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var request = BuildDeliveryRequest(Guid.NewGuid(), zone.Id);
 
@@ -424,7 +443,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, isAvailable: false);
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var request = BuildDeliveryRequest(product.Id, zone.Id);
 
@@ -439,7 +459,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, stock: 3);
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var request = BuildDeliveryRequest(product.Id, zone.Id, quantity: 5);
 
@@ -453,7 +474,8 @@ namespace AuraNova.UnitTests
             using var db = GetInMemoryDb();
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             var request = new CreateOrderRequest
             {
@@ -473,7 +495,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, price: 50.00m);
             var zone = await SeedDeliveryZone(db, cost: 7.00m);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id, quantity: 1));
 
@@ -492,7 +515,8 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db, stock: 10);
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService());
+            var currentUserService = new Mock<ICurrentUserService>();
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
 
             await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id, quantity: 3));
 
