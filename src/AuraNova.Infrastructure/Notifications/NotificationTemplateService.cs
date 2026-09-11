@@ -120,6 +120,7 @@ namespace AuraNova.Infrastructure.Notifications
 
         public async Task<string> BuildPaymentReportedMessageAsync(Order order)
         {
+            await Task.CompletedTask;
             return $"""
                 Hola {GetName(order)}
                 
@@ -151,6 +152,7 @@ namespace AuraNova.Infrastructure.Notifications
 
         public async Task<string> BuildPaymentRejectedMessageAsync(Order order, string? reason)
         {
+            await Task.CompletedTask;
             return $"""
                 Hola {GetName(order)}
                 
@@ -168,6 +170,7 @@ namespace AuraNova.Infrastructure.Notifications
 
         public async Task<string> BuildPreparingMessageAsync(Order order)
         {
+            await Task.CompletedTask;
             return $"""
                 Hola {GetName(order)}
                 
@@ -182,6 +185,7 @@ namespace AuraNova.Infrastructure.Notifications
 
         public async Task<string> BuildReadyMessageAsync(Order order)
         {
+            await Task.CompletedTask;
             if (order.DeliveryType == DeliveryType.Delivery)
             {
                 return $"""
@@ -210,6 +214,7 @@ namespace AuraNova.Infrastructure.Notifications
 
         public async Task<string> BuildShippedMessageAsync(Order order)
         {
+            await Task.CompletedTask;
             return $"""
                 Hola {GetName(order)}
                 

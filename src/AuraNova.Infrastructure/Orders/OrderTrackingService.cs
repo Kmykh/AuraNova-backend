@@ -23,7 +23,7 @@ namespace AuraNova.Infrastructure.Orders
             var order = await _db.Orders
                 .Include(o => o.Customer)
                 .Include(o => o.StatusHistory)
-                .Include(o => o.Items)
+                .Include(o => o.Items!)
                 .ThenInclude(i => i.Product)
                 .Include(o => o.DeliveryZone)
                 .Include(o => o.MeetingPoint)
@@ -91,13 +91,13 @@ namespace AuraNova.Infrastructure.Orders
                 } : null,
 
                 Timeline = timeline,
-                Items = order.Items.Select(i => new PublicTrackingItemResponse
+                Items = order.Items?.Select(i => new PublicTrackingItemResponse
                 {
                     ProductName = i.Product?.Name ?? "Producto Desconocido",
                     Quantity = i.Quantity,
                     UnitPrice = i.UnitPrice,
                     ImageUrl = i.Product?.ImageUrl
-                }).ToList(),
+                }).ToList() ?? new List<PublicTrackingItemResponse>(),
                 Delivery = new PublicTrackingDeliveryResponse
                 {
                     DeliveryZoneName = order.DeliveryZone?.Name,

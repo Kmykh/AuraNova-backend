@@ -29,6 +29,7 @@ namespace AuraNova.Infrastructure.WhatsApp
 
         public async Task<string> GenerateUrlAsync(string phone, string message)
         {
+            await Task.CompletedTask;
             var number = NormalizePhone(phone);
             if (string.IsNullOrWhiteSpace(number))
                 return string.Empty;
