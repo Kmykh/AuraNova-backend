@@ -11,10 +11,11 @@ namespace AuraNova.Infrastructure.Products
     public class ProductService : IProductService
     {
         private readonly AppDbContext _db;
-        private readonly ILogger<ProductService> _logger;
+        private readonly ILogger<ProductService> _logger; // IDE refresh trigger
         private readonly AuraNova.Application.Orders.Interfaces.IProductPriceResolver _priceResolver;
 
-        public ProductService(AppDbContext db, ILogger<ProductService> logger, AuraNova.Application.Orders.Interfaces.IProductPriceResolver priceResolver)
+        public ProductService(AppDbContext db, ILogger<ProductService> logger,
+            AuraNova.Application.Orders.Interfaces.IProductPriceResolver priceResolver)
         {
             _db = db;
             _logger = logger;
@@ -138,7 +139,8 @@ namespace AuraNova.Infrastructure.Products
             _db.Products.Update(product);
             await _db.SaveChangesAsync();
 
-            _logger.LogInformation("Disponibilidad actualizada: {ProductId} - IsAvailable: {IsAvailable}", id, isAvailable);
+            _logger.LogInformation("Disponibilidad actualizada: {ProductId} - IsAvailable: {IsAvailable}", id,
+                isAvailable);
 
             return true;
         }
@@ -152,7 +154,7 @@ namespace AuraNova.Infrastructure.Products
                 .ToListAsync();
 
             var responses = new List<ProductResponse>();
-            foreach(var product in products)
+            foreach (var product in products)
             {
                 var priceResult = await _priceResolver.ResolvePriceAsync(product.Id);
                 responses.Add(MapToResponse(product, priceResult));
@@ -171,7 +173,8 @@ namespace AuraNova.Infrastructure.Products
             return MapToResponse(product, priceResult);
         }
 
-        private static ProductResponse MapToResponse(Product product, AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult? priceResult = null)
+        private static ProductResponse MapToResponse(Product product,
+            AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult? priceResult = null)
         {
             return new ProductResponse
             {
@@ -190,17 +193,19 @@ namespace AuraNova.Infrastructure.Products
                 AllowsButterfly = product.AllowsButterfly,
                 AllowsPhraseCard = product.AllowsPhraseCard,
                 Audience = product.Audience,
-                Category = product.Category != null ? new CategoryResponse
-                {
-                    Id = product.Category.Id,
-                    Name = product.Category.Name,
-                    Slug = product.Category.Slug,
-                    Description = product.Category.Description,
-                    IsActive = product.Category.IsActive,
-                    CreatedAt = product.Category.CreatedAt,
-                    UpdatedAt = product.Category.UpdatedAt
-                } : null,
-                
+                Category = product.Category != null
+                    ? new CategoryResponse
+                    {
+                        Id = product.Category.Id,
+                        Name = product.Category.Name,
+                        Slug = product.Category.Slug,
+                        Description = product.Category.Description,
+                        IsActive = product.Category.IsActive,
+                        CreatedAt = product.Category.CreatedAt,
+                        UpdatedAt = product.Category.UpdatedAt
+                    }
+                    : null,
+
                 EffectivePrice = priceResult?.EffectivePrice ?? product.Price,
                 IsCampaignActive = priceResult?.IsCampaignPrice ?? false,
                 CampaignId = priceResult?.CampaignId,

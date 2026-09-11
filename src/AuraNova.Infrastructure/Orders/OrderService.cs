@@ -15,7 +15,7 @@ namespace AuraNova.Infrastructure.Orders
         ILogger<OrderService> logger,
         IOrderStatusTransitionService transitionService,
         AuraNova.Application.Auth.Interfaces.ICurrentUserService currentUserService,
-        IProductPriceResolver priceResolver) : IOrderService
+        IProductPriceResolver priceResolver) : IOrderService // IDE refresh trigger
     {
         private readonly AppDbContext _db = db;
         private readonly INotificationService _notificationService = notificationService;
@@ -686,14 +686,10 @@ namespace AuraNova.Infrastructure.Orders
     /// <summary>
     /// Thrown when order validation fails (invalid data, unavailable product, insufficient stock, duplicates).
     /// </summary>
-    public class OrderValidationException(string message) : Exception(message)
-    {
-    }
+    public class OrderValidationException(string message) : Exception(message);
 
     /// <summary>
     /// Thrown when a referenced product does not exist.
     /// </summary>
-    public class OrderNotFoundException(string message) : Exception(message)
-    {
-    }
+    public class OrderNotFoundException(string message) : Exception(message);
 }
