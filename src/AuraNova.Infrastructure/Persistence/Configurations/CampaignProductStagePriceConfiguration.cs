@@ -17,7 +17,7 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
             builder.Property(sp => sp.Price).HasColumnType("decimal(18,2)");
             
             // Check constraint to ensure price > 0
-            builder.ToTable(t => t.HasCheckConstraint("CK_CampaignProductStagePrice_Price", "Price > 0"));
+            builder.ToTable(t => t.HasCheckConstraint("CK_CampaignProductStagePrice_Price", "\"Price\" >= 0"));
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -118,7 +118,7 @@ namespace AuraNova.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_CampaignProductStagePrices", x => x.Id);
-                    table.CheckConstraint("CK_CampaignProductStagePrice_Price", "Price > 0");
+                    table.CheckConstraint("CK_CampaignProductStagePrice_Price", "\"Price\" >= 0");
                     table.ForeignKey(
                         name: "FK_CampaignProductStagePrices_CampaignProducts_CampaignProduct~",
                         column: x => x.CampaignProductId,
