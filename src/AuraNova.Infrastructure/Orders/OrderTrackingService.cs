@@ -21,6 +21,7 @@ namespace AuraNova.Infrastructure.Orders
         public async Task<PublicTrackingResponse?> GetTrackingAsync(string orderCode, string trackingToken)
         {
             var order = await _db.Orders
+                .Include(o => o.Customer)
                 .Include(o => o.StatusHistory)
                 .Include(o => o.Items)
                 .ThenInclude(i => i.Product)
@@ -43,22 +44,59 @@ namespace AuraNova.Infrastructure.Orders
             {
                 Status = h.Status.ToString(),
                 Label = OrderStatusLabels.GetLabel(h.Status),
+                Description = OrderStatusDescriptions.GetDescription(h.Status, order),
                 Completed = true,
                 CreatedAt = h.CreatedAt
             }).ToList();
 
+            string? customerFirstName = null;
+            if (!string.IsNullOrWhiteSpace(order.Customer?.Name))
+            {
+                customerFirstName = order.Customer.Name.Split(' ').FirstOrDefault();
+            }
+
             return new PublicTrackingResponse
             {
                 OrderCode = order.OrderCode,
+                CustomerFirstName = customerFirstName,
                 Status = order.Status.ToString(),
                 StatusLabel = OrderStatusLabels.GetLabel(order.Status),
                 DeliveryType = order.DeliveryType.ToString(),
-                Total = order.Total,
+                
+                IsCustomOrder = order.IsCustomOrder,
+                ReferenceImageUrl = order.ReferenceImageUrl,
+                CustomizationNotes = order.CustomizationNotes,
+                Notes = order.Notes,
+
+                Costs = new PublicTrackingCosts
+                {
+                    Subtotal = order.Subtotal,
+                    DeliveryCost = order.DeliveryCost,
+                    CustomizationCost = order.CustomizationCost,
+                    Total = order.Total
+                },
+
+                Estimates = new PublicTrackingEstimates
+                {
+                    CreatedAt = order.CreatedAt,
+                    StartedAt = order.StartedAt,
+                    EstimatedReadyAt = order.EstimatedReadyAt
+                },
+
+                NationalShippingDetails = order.DeliveryType == Domain.Enums.DeliveryType.NationalShipping ? new PublicTrackingNationalShipping
+                {
+                    Provider = order.ShippingProvider,
+                    TrackingCode = order.ShippingTrackingCode,
+                    ProofUrl = order.ShippingProofUrl
+                } : null,
+
                 Timeline = timeline,
                 Items = order.Items.Select(i => new PublicTrackingItemResponse
                 {
                     ProductName = i.Product?.Name ?? "Producto Desconocido",
-                    Quantity = i.Quantity
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice,
+                    ImageUrl = i.Product?.ImageUrl
                 }).ToList(),
                 Delivery = new PublicTrackingDeliveryResponse
                 {

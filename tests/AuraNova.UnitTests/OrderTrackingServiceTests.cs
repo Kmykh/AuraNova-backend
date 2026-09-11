@@ -60,7 +60,7 @@ namespace AuraNova.UnitTests
             Assert.Equal("Preparing", result.Status);
             Assert.Equal("Preparando tu pedido", result.StatusLabel);
             Assert.Equal("Delivery", result.DeliveryType);
-            Assert.Equal(87m, result.Total);
+            Assert.Equal(87m, result.Costs.Total);
         }
 
         [Fact]
