@@ -26,5 +26,12 @@ namespace AuraNova.Application.Products.DTOs
         public bool AllowsLights { get; set; } = false;
         public bool AllowsButterfly { get; set; } = false;
         public bool AllowsPhraseCard { get; set; } = false;
+        
+        // Campaign Fields
+        public decimal EffectivePrice { get; set; }
+        public bool IsCampaignActive { get; set; }
+        public Guid? CampaignId { get; set; }
+        public string? CampaignName { get; set; }
+        public string? CampaignStageName { get; set; }
     }
 }

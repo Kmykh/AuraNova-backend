@@ -14,13 +14,15 @@ namespace AuraNova.Infrastructure.Orders
         INotificationService notificationService,
         ILogger<OrderService> logger,
         IOrderStatusTransitionService transitionService,
-        AuraNova.Application.Auth.Interfaces.ICurrentUserService currentUserService) : IOrderService
+        AuraNova.Application.Auth.Interfaces.ICurrentUserService currentUserService,
+        IProductPriceResolver priceResolver) : IOrderService
     {
         private readonly AppDbContext _db = db;
         private readonly INotificationService _notificationService = notificationService;
         private readonly ILogger<OrderService> _logger = logger;
         private readonly IOrderStatusTransitionService _transitionService = transitionService;
         private readonly AuraNova.Application.Auth.Interfaces.ICurrentUserService _currentUserService = currentUserService;
+        private readonly IProductPriceResolver _priceResolver = priceResolver;
 
 
         public async Task<CreateOrderResponse> CreateAsync(CreateOrderRequest request)
@@ -182,13 +184,16 @@ namespace AuraNova.Infrastructure.Orders
                 foreach (var item in request.Items)
                 {
                     var product = products.First(p => p.Id == item.ProductId);
-                    var itemSubtotal = product.Price * item.Quantity;
+                    
+                    // Resolve campaign price
+                    var priceResult = await _priceResolver.ResolvePriceAsync(product.Id);
+                    var itemSubtotal = priceResult.EffectivePrice * item.Quantity;
 
                     var orderItem = new OrderItem
                     {
                         ProductId = product.Id,
                         Quantity = item.Quantity,
-                        UnitPrice = product.Price, // Historical price snapshot
+                        UnitPrice = priceResult.EffectivePrice, // Historical price snapshot (from campaign or base)
                         Subtotal = itemSubtotal,
                         SelectedPrimaryColor = item.SelectedPrimaryColor,
                         SelectedSecondaryColor = item.SelectedSecondaryColor,
@@ -198,7 +203,13 @@ namespace AuraNova.Infrastructure.Orders
                         HasButterfly = item.HasButterfly,
                         HasPhraseCard = item.HasPhraseCard,
                         PhraseText = item.PhraseText,
-                        PhraseFont = item.PhraseFont
+                        PhraseFont = item.PhraseFont,
+                        
+                        // Campaign tracking context
+                        CampaignId = priceResult.CampaignId,
+                        CampaignStageId = priceResult.CampaignStageId,
+                        AppliedCampaignName = priceResult.CampaignName,
+                        AppliedCampaignStageName = priceResult.CampaignStageName
                     };
 
                     orderItems.Add(orderItem);

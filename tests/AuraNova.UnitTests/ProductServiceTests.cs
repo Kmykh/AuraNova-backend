@@ -1,5 +1,6 @@
 using AuraNova.Application.Products.DTOs;
 using AuraNova.Application.Products.Interfaces;
+using Moq;
 using AuraNova.Domain.Entities;
 using AuraNova.Infrastructure.Persistence;
 using AuraNova.Infrastructure.Products;
@@ -28,7 +29,13 @@ namespace AuraNova.UnitTests
         public async Task CreateAsync_ShouldCreateProductSuccessfully()
         {
             using var db = GetInMemoryDb();
-            var service = new ProductService(db, GetMockLogger());
+            var priceResolver = new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object);
 
             var request = new CreateProductRequest
             {
@@ -52,7 +59,13 @@ namespace AuraNova.UnitTests
         public async Task GetAdminProductsAsync_ShouldReturnAllProducts()
         {
             using var db = GetInMemoryDb();
-            var service = new ProductService(db, GetMockLogger());
+            var priceResolver = new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object);
 
             var p1 = new CreateProductRequest { Name = "Prod1", Price = 10, Stock = 5 };
             var p2 = new CreateProductRequest { Name = "Prod2", Price = 20, Stock = 10 };
@@ -70,7 +83,13 @@ namespace AuraNova.UnitTests
         public async Task GetPublicProductsAsync_ShouldReturnOnlyAvailableProducts()
         {
             using var db = GetInMemoryDb();
-            var service = new ProductService(db, GetMockLogger());
+            var priceResolver = new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object);
 
             var p1 = new CreateProductRequest { Name = "Prod1", Price = 10, Stock = 5 };
             var p2 = new CreateProductRequest { Name = "Prod2", Price = 20, Stock = 10 };
@@ -91,7 +110,13 @@ namespace AuraNova.UnitTests
         public async Task GetPublicByIdAsync_ShouldReturnNullIfNotAvailable()
         {
             using var db = GetInMemoryDb();
-            var service = new ProductService(db, GetMockLogger());
+            var priceResolver = new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object);
 
             var request = new CreateProductRequest { Name = "Prod", Price = 10, Stock = 5 };
             var product = await service.CreateAsync(request);
@@ -107,7 +132,13 @@ namespace AuraNova.UnitTests
         public async Task UpdateStockAsync_ShouldUpdateStockCorrectly()
         {
             using var db = GetInMemoryDb();
-            var service = new ProductService(db, GetMockLogger());
+            var priceResolver = new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object);
 
             var request = new CreateProductRequest { Name = "Prod", Price = 10, Stock = 5 };
             var product = await service.CreateAsync(request);
@@ -123,7 +154,13 @@ namespace AuraNova.UnitTests
         public async Task UpdateAvailabilityAsync_ShouldToggleAvailability()
         {
             using var db = GetInMemoryDb();
-            var service = new ProductService(db, GetMockLogger());
+            var priceResolver = new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object);
 
             var request = new CreateProductRequest { Name = "Prod", Price = 10, Stock = 5 };
             var product = await service.CreateAsync(request);

@@ -26,6 +26,12 @@ namespace AuraNova.Domain.Entities
         public string? PhraseText { get; set; }
         public string? PhraseFont { get; set; }
 
+        // Campaign Tracking
+        public Guid? CampaignId { get; set; }
+        public Guid? CampaignStageId { get; set; }
+        public string? AppliedCampaignName { get; set; }
+        public string? AppliedCampaignStageName { get; set; }
+
         public OrderItem()
         {
             Id = Guid.NewGuid();

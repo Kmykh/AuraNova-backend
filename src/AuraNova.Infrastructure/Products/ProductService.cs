@@ -12,11 +12,13 @@ namespace AuraNova.Infrastructure.Products
     {
         private readonly AppDbContext _db;
         private readonly ILogger<ProductService> _logger;
+        private readonly AuraNova.Application.Orders.Interfaces.IProductPriceResolver _priceResolver;
 
-        public ProductService(AppDbContext db, ILogger<ProductService> logger)
+        public ProductService(AppDbContext db, ILogger<ProductService> logger, AuraNova.Application.Orders.Interfaces.IProductPriceResolver priceResolver)
         {
             _db = db;
             _logger = logger;
+            _priceResolver = priceResolver;
         }
 
         public async Task<ProductResponse> CreateAsync(CreateProductRequest request)
@@ -52,7 +54,7 @@ namespace AuraNova.Infrastructure.Products
 
             _logger.LogInformation("Producto creado: {ProductId} - {ProductName}", product.Id, product.Name);
 
-            return MapToResponse(product);
+            return MapToResponse(product, null);
         }
 
         public async Task<IReadOnlyList<ProductResponse>> GetAdminProductsAsync()
@@ -62,7 +64,7 @@ namespace AuraNova.Infrastructure.Products
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
 
-            return products.Select(MapToResponse).ToList().AsReadOnly();
+            return products.Select(p => MapToResponse(p)).ToList().AsReadOnly();
         }
 
         public async Task<ProductResponse?> GetAdminByIdAsync(Guid id)
@@ -104,7 +106,7 @@ namespace AuraNova.Infrastructure.Products
 
             _logger.LogInformation("Producto actualizado: {ProductId}", id);
 
-            return MapToResponse(product);
+            return MapToResponse(product, null);
         }
 
         public async Task<bool> UpdateStockAsync(Guid id, int stock)
@@ -149,7 +151,14 @@ namespace AuraNova.Infrastructure.Products
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
 
-            return products.Select(MapToResponse).ToList().AsReadOnly();
+            var responses = new List<ProductResponse>();
+            foreach(var product in products)
+            {
+                var priceResult = await _priceResolver.ResolvePriceAsync(product.Id);
+                responses.Add(MapToResponse(product, priceResult));
+            }
+
+            return responses.AsReadOnly();
         }
 
         public async Task<ProductResponse?> GetPublicByIdAsync(Guid id)
@@ -158,10 +167,11 @@ namespace AuraNova.Infrastructure.Products
             if (product == null || !product.IsAvailable)
                 return null;
 
-            return MapToResponse(product);
+            var priceResult = await _priceResolver.ResolvePriceAsync(product.Id);
+            return MapToResponse(product, priceResult);
         }
 
-        private static ProductResponse MapToResponse(Product product)
+        private static ProductResponse MapToResponse(Product product, AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult? priceResult = null)
         {
             return new ProductResponse
             {
@@ -189,7 +199,13 @@ namespace AuraNova.Infrastructure.Products
                     IsActive = product.Category.IsActive,
                     CreatedAt = product.Category.CreatedAt,
                     UpdatedAt = product.Category.UpdatedAt
-                } : null
+                } : null,
+                
+                EffectivePrice = priceResult?.EffectivePrice ?? product.Price,
+                IsCampaignActive = priceResult?.IsCampaignPrice ?? false,
+                CampaignId = priceResult?.CampaignId,
+                CampaignName = priceResult?.CampaignName,
+                CampaignStageName = priceResult?.CampaignStageName
             };
         }
     }

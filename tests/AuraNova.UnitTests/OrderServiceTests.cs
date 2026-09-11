@@ -141,7 +141,13 @@ namespace AuraNova.UnitTests
             var zone = await SeedDeliveryZone(db, cost: 7.00m);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var result = await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id));
 
@@ -158,7 +164,13 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var request = BuildDeliveryRequest(product.Id, Guid.NewGuid());
 
@@ -173,7 +185,13 @@ namespace AuraNova.UnitTests
             var zone = await SeedDeliveryZone(db, isActive: false);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var request = BuildDeliveryRequest(product.Id, zone.Id);
 
@@ -189,7 +207,13 @@ namespace AuraNova.UnitTests
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var request = BuildDeliveryRequest(product.Id, zone.Id);
             request.Delivery.DeliveryAddress = null;
@@ -206,7 +230,13 @@ namespace AuraNova.UnitTests
             var zone = await SeedDeliveryZone(db, cost: 7.00m);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var result = await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id, quantity: 1));
 
@@ -221,7 +251,13 @@ namespace AuraNova.UnitTests
             var zone = await SeedDeliveryZone(db, cost: 7.00m);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var result = await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id, quantity: 1));
 
@@ -242,7 +278,13 @@ namespace AuraNova.UnitTests
             var point = await SeedMeetingPoint(db, cost: 0m);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var result = await service.CreateAsync(BuildMeetingPointRequest(product.Id, point.Id));
 
@@ -257,7 +299,13 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var request = BuildMeetingPointRequest(product.Id, Guid.NewGuid());
 
@@ -272,7 +320,13 @@ namespace AuraNova.UnitTests
             var point = await SeedMeetingPoint(db, isActive: false);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var request = BuildMeetingPointRequest(product.Id, point.Id);
 
@@ -288,7 +342,13 @@ namespace AuraNova.UnitTests
             var point = await SeedMeetingPoint(db, cost: 5.00m);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var result = await service.CreateAsync(BuildMeetingPointRequest(product.Id, point.Id, quantity: 1));
 
@@ -307,7 +367,13 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             await service.CreateAsync(BuildNationalShippingRequest(product.Id));
 
@@ -322,7 +388,13 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var result = await service.CreateAsync(BuildNationalShippingRequest(product.Id));
 
@@ -336,7 +408,13 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var result = await service.CreateAsync(BuildNationalShippingRequest(product.Id));
 
@@ -350,7 +428,13 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var result = await service.CreateAsync(BuildNationalShippingRequest(product.Id));
 
@@ -365,7 +449,13 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var request = BuildNationalShippingRequest(product.Id);
             request.Delivery.Department = null;
@@ -385,7 +475,13 @@ namespace AuraNova.UnitTests
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var request = new CreateOrderRequest
             {
@@ -406,7 +502,13 @@ namespace AuraNova.UnitTests
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var request = new CreateOrderRequest
             {
@@ -429,7 +531,13 @@ namespace AuraNova.UnitTests
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var request = BuildDeliveryRequest(Guid.NewGuid(), zone.Id);
 
@@ -444,7 +552,13 @@ namespace AuraNova.UnitTests
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var request = BuildDeliveryRequest(product.Id, zone.Id);
 
@@ -460,7 +574,13 @@ namespace AuraNova.UnitTests
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var request = BuildDeliveryRequest(product.Id, zone.Id, quantity: 5);
 
@@ -475,7 +595,13 @@ namespace AuraNova.UnitTests
             var product = await SeedProduct(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             var request = new CreateOrderRequest
             {
@@ -496,7 +622,13 @@ namespace AuraNova.UnitTests
             var zone = await SeedDeliveryZone(db, cost: 7.00m);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id, quantity: 1));
 
@@ -516,7 +648,13 @@ namespace AuraNova.UnitTests
             var zone = await SeedDeliveryZone(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object);
+            var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                         {
+                             EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                         });
+            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
 
             await service.CreateAsync(BuildDeliveryRequest(product.Id, zone.Id, quantity: 3));
 

@@ -88,6 +88,7 @@ builder.Services.AddScoped<AuraNova.Application.Auth.Interfaces.ICurrentUserServ
 
 // register product services
 builder.Services.AddScoped<AuraNova.Application.Products.Interfaces.IProductService, AuraNova.Infrastructure.Products.ProductService>();
+builder.Services.AddScoped<AuraNova.Application.Orders.Interfaces.IProductPriceResolver, AuraNova.Infrastructure.Orders.ProductPriceResolver>();
 
 // register category services
 builder.Services.AddScoped<AuraNova.Application.Categories.Interfaces.ICategoryService, AuraNova.Infrastructure.Categories.CategoryService>();

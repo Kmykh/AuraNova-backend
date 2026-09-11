@@ -25,6 +25,12 @@ namespace AuraNova.Infrastructure.Persistence
         public DbSet<Notification> Notifications { get; set; } = null!;
         public DbSet<AuraNova.Domain.Entities.BusinessSettings> BusinessSettings { get; set; } = null!;
 
+        // Campaigns
+        public DbSet<Campaign> Campaigns { get; set; } = null!;
+        public DbSet<CampaignStage> CampaignStages { get; set; } = null!;
+        public DbSet<CampaignProduct> CampaignProducts { get; set; } = null!;
+        public DbSet<CampaignProductStagePrice> CampaignProductStagePrices { get; set; } = null!;
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
