@@ -148,6 +148,9 @@ builder.Services.AddScoped<AuraNova.Application.BusinessSettings.Interfaces.IBus
 // register audit service
 builder.Services.AddScoped<AuraNova.Application.Audit.Interfaces.IAdminAuditService, AuraNova.Infrastructure.Audit.AdminAuditService>();
 
+// register campaign service
+builder.Services.AddScoped<AuraNova.Application.Campaigns.Interfaces.ICampaignService, AuraNova.Infrastructure.Campaigns.CampaignService>();
+
 // Security Settings
 builder.Services.Configure<SecuritySettings>(builder.Configuration.GetSection("Security"));
 var securitySettings = builder.Configuration.GetSection("Security").Get<SecuritySettings>() ?? new SecuritySettings();
