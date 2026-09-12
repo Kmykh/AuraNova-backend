@@ -9,6 +9,7 @@ namespace AuraNova.Application.BusinessSettings.DTOs
         public string WhatsAppNumber { get; set; } = string.Empty;
         public string YapeHolderName { get; set; } = string.Empty;
         public string? YapeQrImageUrl { get; set; }
+        public string? TikTokUsername { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
     }
 }

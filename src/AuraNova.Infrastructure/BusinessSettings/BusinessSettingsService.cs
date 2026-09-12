@@ -73,6 +73,7 @@ namespace AuraNova.Infrastructure.BusinessSettings
             settings.BusinessName = request.BusinessName.Trim();
             settings.WhatsAppNumber = normalizedPhone;
             settings.YapeHolderName = request.YapeHolderName.Trim();
+            settings.TikTokUsername = request.TikTokUsername?.Trim();
             settings.UpdatedAt = DateTimeOffset.UtcNow;
 
             await _db.SaveChangesAsync();
@@ -150,6 +151,7 @@ namespace AuraNova.Infrastructure.BusinessSettings
                 WhatsAppNumber = settings.WhatsAppNumber,
                 YapeHolderName = settings.YapeHolderName,
                 YapeQrImageUrl = settings.YapeQrImageUrl,
+                TikTokUsername = settings.TikTokUsername,
                 UpdatedAt = settings.UpdatedAt
             };
         }
