@@ -13,6 +13,10 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
+
+// Real-Time Live Broadcast (SignalR)
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<AuraNova.Application.LiveBroadcast.Interfaces.ILiveBroadcastStateService, AuraNova.Infrastructure.LiveBroadcast.LiveBroadcastStateService>();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -237,6 +241,7 @@ app.MapHealthChecks("/api/health");
 app.MapHealthChecks("/health");
 
 app.MapControllers();
+app.MapHub<AuraNova.API.Hubs.SuperAdminLiveHub>("/hubs/live");
 
 // Apply migrations automatically
 using (var scope = app.Services.CreateScope())
