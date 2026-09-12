@@ -40,13 +40,24 @@ namespace AuraNova.Infrastructure.Orders
                 .OrderBy(h => h.CreatedAt)
                 .ToList();
 
-            var timeline = history.Select(h => new TrackingTimelineItem
+            var timeline = history.Select(h =>
             {
-                Status = h.Status.ToString(),
-                Label = OrderStatusLabels.GetLabel(h.Status),
-                Description = OrderStatusDescriptions.GetDescription(h.Status, order),
-                Completed = true,
-                CreatedAt = h.CreatedAt
+                var isRejection = !string.IsNullOrWhiteSpace(h.Comment) &&
+                                  h.Comment.Contains("rechazada", System.StringComparison.OrdinalIgnoreCase);
+
+                var label = isRejection ? "Pago rechazado" : OrderStatusLabels.GetLabel(h.Status);
+                var description = !string.IsNullOrWhiteSpace(h.Comment)
+                    ? h.Comment
+                    : OrderStatusDescriptions.GetDescription(h.Status, order);
+
+                return new TrackingTimelineItem
+                {
+                    Status = isRejection ? "PaymentRejected" : h.Status.ToString(),
+                    Label = label,
+                    Description = description,
+                    Completed = true,
+                    CreatedAt = h.CreatedAt
+                };
             }).ToList();
 
             string? customerFirstName = null;
