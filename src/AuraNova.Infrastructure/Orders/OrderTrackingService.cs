@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AuraNova.Application.Orders;
@@ -102,13 +103,15 @@ namespace AuraNova.Infrastructure.Orders
                 } : null,
 
                 Timeline = timeline,
-                Items = order.Items?.Select(i => new PublicTrackingItemResponse
-                {
-                    ProductName = i.Product?.Name ?? "Producto Desconocido",
-                    Quantity = i.Quantity,
-                    UnitPrice = i.UnitPrice,
-                    ImageUrl = i.Product?.ImageUrl
-                }).ToList() ?? new List<PublicTrackingItemResponse>(),
+                Items = order.Items == null
+                    ? new List<PublicTrackingItemResponse>()
+                    : order.Items.Select(i => new PublicTrackingItemResponse
+                    {
+                        ProductName = i.Product?.Name ?? "Producto Desconocido",
+                        Quantity = i.Quantity,
+                        UnitPrice = i.UnitPrice,
+                        ImageUrl = i.Product?.ImageUrl
+                    }).ToList(),
                 Delivery = new PublicTrackingDeliveryResponse
                 {
                     DeliveryZoneName = order.DeliveryZone?.Name,
