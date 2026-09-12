@@ -15,12 +15,26 @@ namespace AuraNova.Infrastructure.LiveBroadcast
                 return new LiveBroadcastStateDto
                 {
                     CurrentLiveText = _state.CurrentLiveText,
+                    IsLiveTextActive = _state.IsLiveTextActive,
                     IsTikTokLiveActive = _state.IsTikTokLiveActive,
                     TikTokUsername = _state.TikTokUsername,
                     ViewerCount = _state.ViewerCount,
                     TotalLikes = _state.TotalLikes,
                     UpdatedAt = _state.UpdatedAt
                 };
+            }
+        }
+
+        public void ToggleLiveText(bool isActive)
+        {
+            lock (_lock)
+            {
+                _state.IsLiveTextActive = isActive;
+                if (!isActive)
+                {
+                    _state.CurrentLiveText = null;
+                }
+                _state.UpdatedAt = DateTimeOffset.UtcNow;
             }
         }
 

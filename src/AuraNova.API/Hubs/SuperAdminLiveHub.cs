@@ -24,8 +24,25 @@ namespace AuraNova.API.Hubs
         }
 
         [Authorize(Roles = "SuperAdmin")]
+        public async Task ToggleLiveText(bool isActive)
+        {
+            _stateService.ToggleLiveText(isActive);
+            await Clients.All.SendAsync("ReceiveLiveTextState", isActive);
+            
+            // If turned off, also clear the current text on all clients
+            if (!isActive)
+            {
+                await Clients.All.SendAsync("ReceiveLiveTyping", null);
+            }
+        }
+
+        [Authorize(Roles = "SuperAdmin")]
         public async Task StreamLiveText(string? text)
         {
+            var currentState = _stateService.GetState();
+            if (!currentState.IsLiveTextActive)
+                return; // Backend strictly blocks message broadcasting if mode is OFF
+
             _stateService.UpdateLiveText(text);
             await Clients.All.SendAsync("ReceiveLiveTyping", text);
         }
