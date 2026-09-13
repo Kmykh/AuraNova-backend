@@ -9,10 +9,14 @@ namespace AuraNova.API.Hubs
     public class SuperAdminLiveHub : Hub
     {
         private readonly ILiveBroadcastStateService _stateService;
+        private readonly AuraNova.Application.BusinessSettings.Interfaces.IBusinessSettingsService _businessSettingsService;
 
-        public SuperAdminLiveHub(ILiveBroadcastStateService stateService)
+        public SuperAdminLiveHub(
+            ILiveBroadcastStateService stateService,
+            AuraNova.Application.BusinessSettings.Interfaces.IBusinessSettingsService businessSettingsService)
         {
             _stateService = stateService;
+            _businessSettingsService = businessSettingsService;
         }
 
         public override async Task OnConnectedAsync()
@@ -45,6 +49,24 @@ namespace AuraNova.API.Hubs
 
             _stateService.UpdateLiveText(text);
             await Clients.All.SendAsync("ReceiveLiveTyping", text);
+        }
+
+        [Authorize(Roles = "SuperAdmin")]
+        public async Task ToggleTikTokLive(bool isActive, string? username = null)
+        {
+            string? usernameToUse = username;
+            if (isActive && string.IsNullOrWhiteSpace(usernameToUse))
+            {
+                var settings = await _businessSettingsService.GetAdminAsync();
+                usernameToUse = settings.TikTokUsername;
+            }
+
+            _stateService.SetTikTokLiveState(isActive, usernameToUse);
+            await Clients.All.SendAsync("ReceiveTikTokLiveState", new
+            {
+                isActive,
+                tikTokUsername = isActive ? usernameToUse : null
+            });
         }
     }
 }

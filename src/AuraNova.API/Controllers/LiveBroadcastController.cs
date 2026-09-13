@@ -13,13 +13,16 @@ namespace AuraNova.API.Controllers
     {
         private readonly ILiveBroadcastStateService _stateService;
         private readonly IHubContext<SuperAdminLiveHub> _hubContext;
+        private readonly AuraNova.Application.BusinessSettings.Interfaces.IBusinessSettingsService _businessSettingsService;
 
         public LiveBroadcastController(
             ILiveBroadcastStateService stateService,
-            IHubContext<SuperAdminLiveHub> hubContext)
+            IHubContext<SuperAdminLiveHub> hubContext,
+            AuraNova.Application.BusinessSettings.Interfaces.IBusinessSettingsService businessSettingsService)
         {
             _stateService = stateService;
             _hubContext = hubContext;
+            _businessSettingsService = businessSettingsService;
         }
 
         /// <summary>
@@ -42,10 +45,42 @@ namespace AuraNova.API.Controllers
             await _hubContext.Clients.All.SendAsync("ReceiveLiveTyping", request.Text);
             return Ok(new { message = "Texto transmitido exitosamente.", text = request.Text });
         }
+
+        /// <summary>
+        /// REST endpoint for SuperAdmin to toggle TikTok Live state.
+        /// Supports both /api/live/toggle and /api/live/tiktok-toggle.
+        /// </summary>
+        [HttpPost("toggle")]
+        [HttpPost("tiktok-toggle")]
+        [Authorize(Roles = "SuperAdmin")]
+        public async Task<IActionResult> ToggleTikTok([FromBody] ToggleTikTokRequest request)
+        {
+            string? username = request.Username;
+            if (request.IsActive && string.IsNullOrWhiteSpace(username))
+            {
+                var settings = await _businessSettingsService.GetAdminAsync();
+                username = settings.TikTokUsername;
+            }
+
+            _stateService.SetTikTokLiveState(request.IsActive, username);
+            await _hubContext.Clients.All.SendAsync("ReceiveTikTokLiveState", new
+            {
+                isActive = request.IsActive,
+                tikTokUsername = request.IsActive ? username : null
+            });
+
+            return Ok(new { message = "Estado de TikTok Live actualizado.", isActive = request.IsActive, username });
+        }
     }
 
     public class StreamTextRequest
     {
         public string? Text { get; set; }
+    }
+
+    public class ToggleTikTokRequest
+    {
+        public bool IsActive { get; set; }
+        public string? Username { get; set; }
     }
 }
