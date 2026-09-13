@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using AuraNova.API.Hubs;
 using AuraNova.Application.LiveBroadcast.Interfaces;
@@ -18,45 +19,49 @@ namespace AuraNova.API.Services
 
     public class TikTokIntegrationManager : ITikTokIntegrationManager
     {
-        private readonly IHubContext<SuperAdminLiveHub> _hubContext;
-        private readonly ILiveBroadcastStateService _stateService;
         private readonly ILogger<TikTokIntegrationManager> _logger;
+        private readonly IHubContext<Hubs.SuperAdminLiveHub> _hubContext;
+        private readonly Application.LiveBroadcast.Interfaces.ILiveBroadcastStateService _stateService;
         private TikTokLiveClient? _client;
 
         public TikTokIntegrationManager(
-            IHubContext<SuperAdminLiveHub> hubContext,
-            ILiveBroadcastStateService stateService,
-            ILogger<TikTokIntegrationManager> logger)
+            ILogger<TikTokIntegrationManager> logger,
+            IHubContext<Hubs.SuperAdminLiveHub> hubContext,
+            Application.LiveBroadcast.Interfaces.ILiveBroadcastStateService stateService)
         {
+            _logger = logger;
             _hubContext = hubContext;
             _stateService = stateService;
-            _logger = logger;
         }
 
-        public async Task ConnectAsync(string username)
+        public Task ConnectAsync(string username)
         {
-            if (string.IsNullOrWhiteSpace(username))
-            {
-                return;
-            }
-
             try
             {
-                await DisconnectAsync(); // Ensure any existing connection is closed
+                if (string.IsNullOrWhiteSpace(username)) return Task.CompletedTask;
 
-                _logger.LogInformation("Connecting to TikTok Live for username: {Username}", username);
+                // Stop existing connection if any
+                if (_client != null)
+                {
+                    _client.Stop();
+                    _client = null;
+                }
 
-                _client = new TikTokLiveClient(username);
+                _logger.LogInformation("Initializing TikTok Live connection for user: {Username}", username);
 
-                _client.OnCommentRecieved += Client_OnCommentRecieved;
-                _client.OnLikesRecieved += Client_OnLikesRecieved;
-                _client.OnViewerCountUpdated += Client_OnViewerCountUpdated;
+                // Initialize client
+                _client = new TikTokLiveClient(username, "");
+
+                // Register event handlers
+                _client.OnChatMessage += Client_OnChatMessage;
+                _client.OnLike += Client_OnLike;
+                _client.OnRoomUpdate += Client_OnRoomUpdate;
 
                 _ = Task.Run(() => 
                 {
                     try
                     {
-                        _client.Run(null);
+                        _client.Run(new CancellationToken());
                     }
                     catch (Exception ex)
                     {
@@ -68,6 +73,7 @@ namespace AuraNova.API.Services
             {
                 _logger.LogError(ex, "Error connecting to TikTok Live for username: {Username}", username);
             }
+            return Task.CompletedTask;
         }
 
         public Task DisconnectAsync()
@@ -77,9 +83,9 @@ namespace AuraNova.API.Services
                 try
                 {
                     _logger.LogInformation("Disconnecting from TikTok Live.");
-                    _client.OnCommentRecieved -= Client_OnCommentRecieved;
-                    _client.OnLikesRecieved -= Client_OnLikesRecieved;
-                    _client.OnViewerCountUpdated -= Client_OnViewerCountUpdated;
+                    _client.OnChatMessage -= Client_OnChatMessage;
+                    _client.OnLike -= Client_OnLike;
+                    _client.OnRoomUpdate -= Client_OnRoomUpdate;
                     _client.Stop();
                 }
                 catch (Exception ex)
@@ -94,30 +100,31 @@ namespace AuraNova.API.Services
             return Task.CompletedTask;
         }
 
-        private async void Client_OnViewerCountUpdated(object? sender, TikTokLiveSharp.Models.WebcastRoomUserSeqMessage e)
+        private async void Client_OnRoomUpdate(TikTokLiveClient sender, TikTokLiveSharp.Events.RoomUpdate e)
         {
             try
             {
                 var state = _stateService.GetState();
-                _stateService.UpdateTikTokStats(e.viewerCount, state.TotalLikes);
+                var viewerCount = (int)e.NumberOfViewers;
+                _stateService.UpdateTikTokStats(viewerCount, state.TotalLikes);
                 await _hubContext.Clients.All.SendAsync("ReceiveTikTokStats", new
                 {
-                    viewerCount = e.viewerCount,
+                    viewerCount = viewerCount,
                     totalLikes = state.TotalLikes
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error handling ViewerCountUpdated.");
+                _logger.LogError(ex, "Error handling RoomUpdate.");
             }
         }
 
-        private async void Client_OnLikesRecieved(object? sender, TikTokLiveSharp.Models.WebcastLikeMessage e)
+        private async void Client_OnLike(TikTokLiveClient sender, TikTokLiveSharp.Events.Like e)
         {
             try
             {
                 var state = _stateService.GetState();
-                var newTotal = state.TotalLikes + e.likeCount;
+                var newTotal = state.TotalLikes + (int)e.Count;
                 _stateService.UpdateTikTokStats(state.ViewerCount, newTotal);
                 await _hubContext.Clients.All.SendAsync("ReceiveTikTokStats", new
                 {
@@ -127,19 +134,19 @@ namespace AuraNova.API.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error handling LikesRecieved.");
+                _logger.LogError(ex, "Error handling Like.");
             }
         }
 
-        private async void Client_OnCommentRecieved(object? sender, TikTokLiveSharp.Models.WebcastChatMessage e)
+        private async void Client_OnChatMessage(TikTokLiveClient sender, TikTokLiveSharp.Events.Chat e)
         {
             try
             {
                 var dto = new TikTokCommentDto
                 {
-                    Username = e.User.uniqueId,
-                    Comment = e.Comment,
-                    UserAvatarUrl = e.User.profilePicture?.Urls?.FirstOrDefault() ?? "",
+                    Username = e.Sender.UniqueId,
+                    Comment = e.Message,
+                    UserAvatarUrl = e.Sender.AvatarThumbnail?.Urls?.FirstOrDefault() ?? "",
                     Timestamp = DateTimeOffset.UtcNow
                 };
 
@@ -147,7 +154,7 @@ namespace AuraNova.API.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error handling CommentRecieved.");
+                _logger.LogError(ex, "Error handling ChatMessage.");
             }
         }
     }
