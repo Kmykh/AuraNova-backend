@@ -40,6 +40,8 @@ namespace AuraNova.API.Services
             {
                 if (string.IsNullOrWhiteSpace(username)) return Task.CompletedTask;
 
+                username = username.Trim().TrimStart('@');
+
                 // Stop existing connection if any
                 if (_client != null)
                 {
