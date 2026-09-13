@@ -16,10 +16,6 @@ namespace AuraNova.Infrastructure.LiveBroadcast
                 {
                     CurrentLiveText = _state.CurrentLiveText,
                     IsLiveTextActive = _state.IsLiveTextActive,
-                    IsTikTokLiveActive = _state.IsTikTokLiveActive,
-                    TikTokUsername = _state.TikTokUsername,
-                    ViewerCount = _state.ViewerCount,
-                    TotalLikes = _state.TotalLikes,
                     UpdatedAt = _state.UpdatedAt
                 };
             }
@@ -43,31 +39,6 @@ namespace AuraNova.Infrastructure.LiveBroadcast
             lock (_lock)
             {
                 _state.CurrentLiveText = text;
-                _state.UpdatedAt = DateTimeOffset.UtcNow;
-            }
-        }
-
-        public void SetTikTokLiveState(bool isActive, string? username)
-        {
-            lock (_lock)
-            {
-                _state.IsTikTokLiveActive = isActive;
-                _state.TikTokUsername = isActive ? username : null;
-                if (!isActive)
-                {
-                    _state.ViewerCount = 0;
-                    _state.TotalLikes = 0;
-                }
-                _state.UpdatedAt = DateTimeOffset.UtcNow;
-            }
-        }
-
-        public void UpdateTikTokStats(int viewerCount, long totalLikes)
-        {
-            lock (_lock)
-            {
-                _state.ViewerCount = viewerCount;
-                _state.TotalLikes = totalLikes;
                 _state.UpdatedAt = DateTimeOffset.UtcNow;
             }
         }

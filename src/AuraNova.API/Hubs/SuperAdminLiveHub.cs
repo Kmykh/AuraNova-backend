@@ -9,17 +9,10 @@ namespace AuraNova.API.Hubs
     public class SuperAdminLiveHub : Hub
     {
         private readonly ILiveBroadcastStateService _stateService;
-        private readonly AuraNova.Application.BusinessSettings.Interfaces.IBusinessSettingsService _businessSettingsService;
-        private readonly AuraNova.API.Services.ITikTokIntegrationManager _tikTokManager;
 
-        public SuperAdminLiveHub(
-            ILiveBroadcastStateService stateService,
-            AuraNova.Application.BusinessSettings.Interfaces.IBusinessSettingsService businessSettingsService,
-            AuraNova.API.Services.ITikTokIntegrationManager tikTokManager)
+        public SuperAdminLiveHub(ILiveBroadcastStateService stateService)
         {
             _stateService = stateService;
-            _businessSettingsService = businessSettingsService;
-            _tikTokManager = tikTokManager;
         }
 
         public override async Task OnConnectedAsync()
@@ -52,58 +45,6 @@ namespace AuraNova.API.Hubs
 
             _stateService.UpdateLiveText(text);
             await Clients.All.SendAsync("ReceiveLiveTyping", text);
-        }
-
-        [Authorize(Roles = "SuperAdmin")]
-        public async Task ToggleTikTokLive(bool isActive, string? frontendUsername)
-        {
-            string? usernameToUse = null;
-
-            if (isActive)
-            {
-                // Fetch official TikTok username from DB settings
-                var settings = await _businessSettingsService.GetAdminAsync();
-                usernameToUse = !string.IsNullOrWhiteSpace(settings.TikTokUsername) 
-                    ? settings.TikTokUsername 
-                    : frontendUsername; // Fallback to frontend input if DB is empty
-
-                if (!string.IsNullOrWhiteSpace(usernameToUse))
-                {
-                    await _tikTokManager.ConnectAsync(usernameToUse);
-                }
-            }
-            else
-            {
-                await _tikTokManager.DisconnectAsync();
-            }
-
-            _stateService.SetTikTokLiveState(isActive, usernameToUse);
-            await Clients.All.SendAsync("ReceiveTikTokLiveState", new
-            {
-                isActive,
-                tikTokUsername = usernameToUse
-            });
-        }
-
-        [Authorize(Roles = "SuperAdmin")]
-        public async Task BroadcastTikTokComment(TikTokCommentDto comment)
-        {
-            if (comment == null || string.IsNullOrWhiteSpace(comment.Comment))
-                return;
-
-            comment.Timestamp = DateTimeOffset.UtcNow;
-            await Clients.All.SendAsync("ReceiveTikTokComment", comment);
-        }
-
-        [Authorize(Roles = "SuperAdmin")]
-        public async Task UpdateTikTokStats(int viewerCount, long totalLikes)
-        {
-            _stateService.UpdateTikTokStats(viewerCount, totalLikes);
-            await Clients.All.SendAsync("ReceiveTikTokStats", new
-            {
-                viewerCount,
-                totalLikes
-            });
         }
     }
 }
