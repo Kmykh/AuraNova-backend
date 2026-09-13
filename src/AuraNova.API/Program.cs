@@ -17,6 +17,7 @@ builder.Services.AddControllers()
 // Real-Time Live Broadcast (SignalR)
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<AuraNova.Application.LiveBroadcast.Interfaces.ILiveBroadcastStateService, AuraNova.Infrastructure.LiveBroadcast.LiveBroadcastStateService>();
+builder.Services.AddSingleton<AuraNova.API.Services.ITikTokIntegrationManager, AuraNova.API.Services.TikTokIntegrationManager>();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>

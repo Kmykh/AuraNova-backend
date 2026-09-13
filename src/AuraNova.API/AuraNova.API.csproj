@@ -14,6 +14,7 @@
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.8" />
+        <PackageReference Include="TikTokLiveSharp" Version="0.1.4" />
     </ItemGroup>
 
     <ItemGroup>

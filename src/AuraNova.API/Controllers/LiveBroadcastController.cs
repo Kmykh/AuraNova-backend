@@ -13,13 +13,16 @@ namespace AuraNova.API.Controllers
     {
         private readonly ILiveBroadcastStateService _stateService;
         private readonly IHubContext<SuperAdminLiveHub> _hubContext;
+        private readonly AuraNova.API.Services.ITikTokIntegrationManager _tikTokManager;
 
         public LiveBroadcastController(
             ILiveBroadcastStateService stateService,
-            IHubContext<SuperAdminLiveHub> hubContext)
+            IHubContext<SuperAdminLiveHub> hubContext,
+            AuraNova.API.Services.ITikTokIntegrationManager tikTokManager)
         {
             _stateService = stateService;
             _hubContext = hubContext;
+            _tikTokManager = tikTokManager;
         }
 
         /// <summary>
@@ -50,11 +53,20 @@ namespace AuraNova.API.Controllers
         [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> ToggleTikTok([FromBody] ToggleTikTokRequest request)
         {
+            if (request.IsActive && !string.IsNullOrWhiteSpace(request.Username))
+            {
+                await _tikTokManager.ConnectAsync(request.Username);
+            }
+            else
+            {
+                await _tikTokManager.DisconnectAsync();
+            }
+
             _stateService.SetTikTokLiveState(request.IsActive, request.Username);
             await _hubContext.Clients.All.SendAsync("ReceiveTikTokLiveState", new
             {
                 isActive = request.IsActive,
-                username = request.IsActive ? request.Username : null
+                tikTokUsername = request.IsActive ? request.Username : null
             });
             return Ok(new { message = "Estado de TikTok Live actualizado.", isActive = request.IsActive, username = request.Username });
         }

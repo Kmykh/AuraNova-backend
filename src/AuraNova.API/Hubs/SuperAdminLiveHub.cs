@@ -10,13 +10,16 @@ namespace AuraNova.API.Hubs
     {
         private readonly ILiveBroadcastStateService _stateService;
         private readonly AuraNova.Application.BusinessSettings.Interfaces.IBusinessSettingsService _businessSettingsService;
+        private readonly AuraNova.API.Services.ITikTokIntegrationManager _tikTokManager;
 
         public SuperAdminLiveHub(
             ILiveBroadcastStateService stateService,
-            AuraNova.Application.BusinessSettings.Interfaces.IBusinessSettingsService businessSettingsService)
+            AuraNova.Application.BusinessSettings.Interfaces.IBusinessSettingsService businessSettingsService,
+            AuraNova.API.Services.ITikTokIntegrationManager tikTokManager)
         {
             _stateService = stateService;
             _businessSettingsService = businessSettingsService;
+            _tikTokManager = tikTokManager;
         }
 
         public override async Task OnConnectedAsync()
@@ -63,13 +66,22 @@ namespace AuraNova.API.Hubs
                 usernameToUse = !string.IsNullOrWhiteSpace(settings.TikTokUsername) 
                     ? settings.TikTokUsername 
                     : frontendUsername; // Fallback to frontend input if DB is empty
+
+                if (!string.IsNullOrWhiteSpace(usernameToUse))
+                {
+                    await _tikTokManager.ConnectAsync(usernameToUse);
+                }
+            }
+            else
+            {
+                await _tikTokManager.DisconnectAsync();
             }
 
             _stateService.SetTikTokLiveState(isActive, usernameToUse);
             await Clients.All.SendAsync("ReceiveTikTokLiveState", new
             {
                 isActive,
-                username = usernameToUse
+                tikTokUsername = usernameToUse
             });
         }
 
