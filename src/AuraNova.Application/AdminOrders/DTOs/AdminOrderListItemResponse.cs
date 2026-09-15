@@ -9,6 +9,7 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public string CustomerName { get; set; } = string.Empty;
         public string CustomerPhone { get; set; } = string.Empty;
         public string DeliveryType { get; set; } = string.Empty;
+        public string TrackingToken { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public decimal Subtotal { get; set; }
         public decimal? DeliveryCost { get; set; }

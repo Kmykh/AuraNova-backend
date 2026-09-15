@@ -9,6 +9,7 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public string OrderCode { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string DeliveryType { get; set; } = string.Empty;
+        public string TrackingToken { get; set; } = string.Empty;
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
         public decimal Subtotal { get; set; }
