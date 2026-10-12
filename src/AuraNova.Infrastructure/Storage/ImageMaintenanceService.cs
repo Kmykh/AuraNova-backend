@@ -34,7 +34,8 @@ namespace AuraNova.Infrastructure.Storage
 
             foreach (var file in files)
             {
-                if (inUse.Contains(file.Path))
+                // ".emptyFolderPlaceholder" lo crea el dashboard de Supabase para mostrar la carpeta
+                if (inUse.Contains(file.Path) || Path.GetFileName(file.Path).StartsWith('.'))
                     continue;
 
                 if (file.CreatedAt == null || file.CreatedAt > cutoff)

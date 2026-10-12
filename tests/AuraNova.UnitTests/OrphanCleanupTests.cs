@@ -41,6 +41,7 @@ namespace AuraNova.UnitTests
                 new StoredFileInfo("products/in-use.webp", 100, old),
                 new StoredFileInfo("products/in-use-absolute.webp", 100, old),
                 new StoredFileInfo("products/orphan.png", 2_000_000, old),
+                new StoredFileInfo("products/.emptyFolderPlaceholder", 0, old),
                 new StoredFileInfo("products/just-uploaded.webp", 150_000, DateTimeOffset.UtcNow.AddMinutes(-5))
             ]);
 
