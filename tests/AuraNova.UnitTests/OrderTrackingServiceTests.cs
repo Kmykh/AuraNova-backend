@@ -51,7 +51,7 @@ namespace AuraNova.UnitTests
         {
             using var db = GetInMemoryDb();
             var order = await SeedOrderWithHistory(db);
-            var service = new OrderTrackingService(db);
+            var service = new OrderTrackingService(db, new TestStorage());
 
             var result = await service.GetTrackingAsync(order.OrderCode, order.TrackingToken);
 
@@ -68,7 +68,7 @@ namespace AuraNova.UnitTests
         {
             using var db = GetInMemoryDb();
             var order = await SeedOrderWithHistory(db);
-            var service = new OrderTrackingService(db);
+            var service = new OrderTrackingService(db, new TestStorage());
 
             var result = await service.GetTrackingAsync(order.OrderCode, order.TrackingToken);
 
@@ -84,7 +84,7 @@ namespace AuraNova.UnitTests
         {
             using var db = GetInMemoryDb();
             var order = await SeedOrderWithHistory(db);
-            var service = new OrderTrackingService(db);
+            var service = new OrderTrackingService(db, new TestStorage());
 
             var result = await service.GetTrackingAsync(order.OrderCode, "wrong-token");
             Assert.Null(result);
@@ -95,7 +95,7 @@ namespace AuraNova.UnitTests
         {
             using var db = GetInMemoryDb();
             await SeedOrderWithHistory(db);
-            var service = new OrderTrackingService(db);
+            var service = new OrderTrackingService(db, new TestStorage());
 
             var result = await service.GetTrackingAsync("PED-FAKE-999999", "any-token");
             Assert.Null(result);
@@ -106,7 +106,7 @@ namespace AuraNova.UnitTests
         {
             using var db = GetInMemoryDb();
             var order = await SeedOrderWithHistory(db);
-            var service = new OrderTrackingService(db);
+            var service = new OrderTrackingService(db, new TestStorage());
 
             var result = await service.GetTrackingAsync(order.OrderCode, order.TrackingToken);
 

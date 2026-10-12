@@ -178,9 +178,9 @@ namespace AuraNova.API.Controllers
             {
                 return BadRequest(new { message = ex.Message });
             }
-            catch (Exception ex)
+            catch (InvalidImageException ex)
             {
-                return StatusCode(500, new { message = "Error al procesar la entrega a agencia.", details = ex.Message });
+                return BadRequest(new { message = ex.Message });
             }
         }
     }

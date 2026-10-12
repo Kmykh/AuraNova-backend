@@ -40,8 +40,7 @@ namespace AuraNova.Infrastructure.Orders
         public async Task<OrderStatusChangeResponse> ChangeStatusAsync(Guid orderId, OrderStatus newStatus, string? comment)
         {
             var order = await _db.Orders
-                .Include(o => o.Items!)
-                    .ThenInclude(i => i.Product)
+                .Include(o => o.Items)
                 .FirstOrDefaultAsync(o => o.Id == orderId);
             if (order == null)
                 throw new OrderNotFoundException($"Pedido con Id '{orderId}' no encontrado.");
@@ -64,15 +63,12 @@ namespace AuraNova.Infrastructure.Orders
                 order.Status = newStatus;
                 order.UpdatedAt = DateTimeOffset.UtcNow;
 
-                // Return stock if the order is cancelled
+                // Return stock if the order is cancelled (atomic increment, safe with concurrent orders)
                 if (newStatus == OrderStatus.Cancelled && oldStatus != OrderStatus.Cancelled)
                 {
                     foreach (var item in order.Items!)
                     {
-                        if (item.Product != null)
-                        {
-                            item.Product.Stock += item.Quantity;
-                        }
+                        await ProductStock.ReleaseAsync(_db, item.ProductId, item.Quantity);
                     }
                 }
 

@@ -20,3 +20,7 @@ obj/
 # OS
 .DS_Store
 Thumbs.db
+
+# Tools
+node_modules/
+exports/

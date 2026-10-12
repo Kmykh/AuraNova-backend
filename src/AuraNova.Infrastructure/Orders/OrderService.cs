@@ -75,9 +75,6 @@ namespace AuraNova.Infrastructure.Orders
                 if (product.Stock < item.Quantity)
                     throw new OrderValidationException(
                         $"Stock insuficiente para '{product.Name}'. Disponible: {product.Stock}, solicitado: {item.Quantity}.");
-
-                // Deduct stock to reserve the items
-                product.Stock -= item.Quantity;
             }
 
             // --- 7. Validate delivery info ---
@@ -165,6 +162,17 @@ namespace AuraNova.Infrastructure.Orders
 
             try
             {
+                // Reserve stock atomically inside the transaction (rolled back if anything below fails)
+                foreach (var item in request.Items)
+                {
+                    if (!await ProductStock.TryReserveAsync(_db, item.ProductId, item.Quantity))
+                    {
+                        var productName = products.First(p => p.Id == item.ProductId).Name;
+                        throw new OrderValidationException(
+                            $"Stock insuficiente para '{productName}'. Otro cliente acaba de comprar las últimas unidades.");
+                    }
+                }
+
                 // Create Customer
                 var customer = new Customer
                 {
@@ -499,6 +507,15 @@ namespace AuraNova.Infrastructure.Orders
         {
             var prefix = "PED-";
 
+            if (_db.Database.IsRelational())
+            {
+                // Database sequence: unique even when two orders are created at the same time
+                var next = await _db.Database
+                    .SqlQueryRaw<long>("SELECT nextval('\"OrderCodeSequence\"') AS \"Value\"")
+                    .SingleAsync();
+                return $"{prefix}{next:D6}";
+            }
+
             // Find the highest existing order code for this prefix
             var lastCode = await _db.Orders
                 .Where(o => o.OrderCode.StartsWith(prefix))
@@ -661,11 +678,18 @@ namespace AuraNova.Infrastructure.Orders
 
         public async Task CancelAsync(Guid id, string reason)
         {
-            var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == id);
+            var order = await _db.Orders.Include(o => o.Items).FirstOrDefaultAsync(o => o.Id == id);
             if (order == null) throw new OrderNotFoundException("Pedido no encontrado.");
 
             if (!_transitionService.IsTransitionAllowed(order.Status, OrderStatus.Cancelled, order.DeliveryType))
                 throw new OrderValidationException($"No se puede cancelar desde el estado {order.Status}.");
+
+            await using var transaction = _db.Database.IsRelational()
+                ? await _db.Database.BeginTransactionAsync()
+                : null;
+
+            foreach (var item in order.Items ?? [])
+                await ProductStock.ReleaseAsync(_db, item.ProductId, item.Quantity);
 
             order.Status = OrderStatus.Cancelled;
             order.UpdatedAt = DateTimeOffset.UtcNow;
@@ -680,6 +704,9 @@ namespace AuraNova.Infrastructure.Orders
             });
 
             await _db.SaveChangesAsync();
+
+            if (transaction != null)
+                await transaction.CommitAsync();
         }
     }
 

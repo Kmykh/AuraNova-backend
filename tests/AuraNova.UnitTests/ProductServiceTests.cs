@@ -35,7 +35,7 @@ namespace AuraNova.UnitTests
                          {
                              EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
                          });
-            var service = new ProductService(db, GetMockLogger(), priceResolver.Object);
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object, new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>().Object);
 
             var request = new CreateProductRequest
             {
@@ -65,7 +65,7 @@ namespace AuraNova.UnitTests
                          {
                              EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
                          });
-            var service = new ProductService(db, GetMockLogger(), priceResolver.Object);
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object, new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>().Object);
 
             var p1 = new CreateProductRequest { Name = "Prod1", Price = 10, Stock = 5 };
             var p2 = new CreateProductRequest { Name = "Prod2", Price = 20, Stock = 10 };
@@ -89,7 +89,14 @@ namespace AuraNova.UnitTests
                          {
                              EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
                          });
-            var service = new ProductService(db, GetMockLogger(), priceResolver.Object);
+            priceResolver.Setup(x => x.ResolvePricesAsync(It.IsAny<IReadOnlyCollection<Guid>>(), It.IsAny<DateTimeOffset?>()))
+                         .ReturnsAsync((IReadOnlyCollection<Guid> ids, DateTimeOffset? dt) => (IReadOnlyDictionary<Guid, AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult>)ids.ToDictionary(
+                             id => id,
+                             id => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
+                             {
+                                 EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
+                             }));
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object, new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>().Object);
 
             var p1 = new CreateProductRequest { Name = "Prod1", Price = 10, Stock = 5 };
             var p2 = new CreateProductRequest { Name = "Prod2", Price = 20, Stock = 10 };
@@ -116,7 +123,7 @@ namespace AuraNova.UnitTests
                          {
                              EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
                          });
-            var service = new ProductService(db, GetMockLogger(), priceResolver.Object);
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object, new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>().Object);
 
             var request = new CreateProductRequest { Name = "Prod", Price = 10, Stock = 5 };
             var product = await service.CreateAsync(request);
@@ -138,7 +145,7 @@ namespace AuraNova.UnitTests
                          {
                              EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
                          });
-            var service = new ProductService(db, GetMockLogger(), priceResolver.Object);
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object, new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>().Object);
 
             var request = new CreateProductRequest { Name = "Prod", Price = 10, Stock = 5 };
             var product = await service.CreateAsync(request);
@@ -160,7 +167,7 @@ namespace AuraNova.UnitTests
                          {
                              EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
                          });
-            var service = new ProductService(db, GetMockLogger(), priceResolver.Object);
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object, new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>().Object);
 
             var request = new CreateProductRequest { Name = "Prod", Price = 10, Stock = 5 };
             var product = await service.CreateAsync(request);
@@ -171,6 +178,37 @@ namespace AuraNova.UnitTests
             var result = await service.GetAdminByIdAsync(product.Id);
 
             Assert.False(result?.IsAvailable);
+        }
+            [Fact]
+        public async Task UpdateAsync_ReplacingImage_DeletesPreviousFileWhenUnused()
+        {
+            using var db = GetInMemoryDb();
+            var priceResolver = new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            var storage = new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>();
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object, storage.Object);
+
+            var product = await service.CreateAsync(new CreateProductRequest { Name = "Ramo", Price = 10, Stock = 5, ImageUrl = "products/old.jpg" });
+            await service.CreateAsync(new CreateProductRequest { Name = "Otro", Price = 10, Stock = 5, ImageUrl = "products/shared.jpg" });
+
+            await service.UpdateAsync(product.Id, new UpdateProductRequest { Name = "Ramo", Price = 10, ImageUrl = "products/new.webp" });
+
+            storage.Verify(s => s.DeleteAsync("products/old.jpg"), Moq.Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_ReplacingSharedImage_KeepsFile()
+        {
+            using var db = GetInMemoryDb();
+            var priceResolver = new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            var storage = new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>();
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object, storage.Object);
+
+            var product = await service.CreateAsync(new CreateProductRequest { Name = "Ramo", Price = 10, Stock = 5, ImageUrl = "products/shared.jpg" });
+            await service.CreateAsync(new CreateProductRequest { Name = "Otro", Price = 10, Stock = 5, ImageUrl = "products/shared.jpg" });
+
+            await service.UpdateAsync(product.Id, new UpdateProductRequest { Name = "Ramo", Price = 10, ImageUrl = "products/new.webp" });
+
+            storage.Verify(s => s.DeleteAsync(Moq.It.IsAny<string>()), Moq.Times.Never);
         }
     }
 }

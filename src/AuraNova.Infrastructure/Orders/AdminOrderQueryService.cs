@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using AuraNova.Application.AdminOrders.DTOs;
 using AuraNova.Application.AdminOrders.Interfaces;
 using AuraNova.Application.Common.Models;
+using AuraNova.Application.Storage.Interfaces;
 using AuraNova.Domain.Entities;
 using AuraNova.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -13,10 +14,12 @@ namespace AuraNova.Infrastructure.Orders
     public class AdminOrderQueryService : IAdminOrderQueryService
     {
         private readonly AppDbContext _db;
+        private readonly IFileStorageService _storage;
 
-        public AdminOrderQueryService(AppDbContext db)
+        public AdminOrderQueryService(AppDbContext db, IFileStorageService storage)
         {
             _db = db;
+            _storage = storage;
         }
 
         public async Task<PagedResponse<AdminOrderListItemResponse>> GetOrdersAsync(AdminOrderFilterRequest request)
@@ -56,19 +59,38 @@ namespace AuraNova.Infrastructure.Orders
 
             var totalItems = await query.CountAsync();
 
-            var orderEntities = await query
-                .Include(o => o.Customer)
+            // Proyección: no se cargan columnas pesadas (p. ej. ReferenceImageUrl) que el listado no usa.
+            var rows = await query
                 .OrderByDescending(o => o.CreatedAt)
                 .Skip((request.Page - 1) * request.PageSize)
                 .Take(request.PageSize)
+                .Select(o => new
+                {
+                    o.Id,
+                    o.OrderCode,
+                    CustomerName = o.Customer != null ? o.Customer.Name : string.Empty,
+                    CustomerPhone = o.Customer != null ? o.Customer.Phone : string.Empty,
+                    o.DeliveryType,
+                    o.TrackingToken,
+                    o.Status,
+                    o.Subtotal,
+                    o.DeliveryCost,
+                    o.CustomizationCost,
+                    o.Total,
+                    o.IsCustomOrder,
+                    o.CreatedAt,
+                    o.UpdatedAt,
+                    o.StartedAt,
+                    o.EstimatedReadyAt
+                })
                 .ToListAsync();
 
-            var items = orderEntities.Select(o => new AdminOrderListItemResponse
+            var items = rows.Select(o => new AdminOrderListItemResponse
                 {
                     Id = o.Id,
                     OrderCode = o.OrderCode,
-                    CustomerName = o.Customer != null ? o.Customer.Name : string.Empty,
-                    CustomerPhone = o.Customer != null ? o.Customer.Phone : string.Empty,
+                    CustomerName = o.CustomerName,
+                    CustomerPhone = o.CustomerPhone,
                     DeliveryType = o.DeliveryType.ToString(),
                     TrackingToken = o.TrackingToken,
                     Status = o.Status.ToString(),
@@ -103,6 +125,11 @@ namespace AuraNova.Infrastructure.Orders
             if (order == null)
                 return null;
 
+            // Customer files (reference, shipping proof, payment evidence) are private: signed, short-lived URLs
+            var fileUrls = await _storage.GetReadUrlsAsync(
+                new[] { order.ReferenceImageUrl, order.ShippingProofUrl, order.Payment?.EvidenceUrl }.OfType<string>());
+            string? FileUrl(string? stored) => stored == null ? null : fileUrls.GetValueOrDefault(stored);
+
             var response = new AdminOrderDetailResponse
             {
                 Id = order.Id,
@@ -118,7 +145,7 @@ namespace AuraNova.Infrastructure.Orders
                 Total = order.Total,
                 HasPaymentEvidence = order.Payment != null && !string.IsNullOrWhiteSpace(order.Payment.EvidenceUrl),
                 IsCustomOrder = order.IsCustomOrder,
-                ReferenceImageUrl = order.ReferenceImageUrl,
+                ReferenceImageUrl = FileUrl(order.ReferenceImageUrl),
                 CustomizationNotes = order.CustomizationNotes,
                 StartedAt = order.StartedAt,
                 EstimatedReadyAt = order.EstimatedReadyAt,
@@ -126,7 +153,7 @@ namespace AuraNova.Infrastructure.Orders
                 DeliveredToAgencyAt = order.DeliveredToAgencyAt,
                 ShippingProvider = order.ShippingProvider,
                 ShippingTrackingCode = order.ShippingTrackingCode,
-                ShippingProofUrl = order.ShippingProofUrl,
+                ShippingProofUrl = FileUrl(order.ShippingProofUrl),
                 Customer = new AdminOrderCustomer
                 {
                     Name = order.Customer?.Name ?? string.Empty,
@@ -195,7 +222,7 @@ namespace AuraNova.Infrastructure.Orders
                     PaymentStatus = order.Payment.Status.ToString(),
                     PaymentMethod = order.Payment.Method.ToString(),
                     Amount = order.Payment.Amount,
-                    EvidenceUrl = order.Payment.EvidenceUrl,
+                    EvidenceUrl = FileUrl(order.Payment.EvidenceUrl),
                     CreatedAt = order.Payment.CreatedAt,
                     VerifiedAt = order.Payment.VerifiedAt
                 };

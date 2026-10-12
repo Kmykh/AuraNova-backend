@@ -5,9 +5,12 @@ using AuraNova.Application.Campaigns.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using AuraNova.API.Configuration;
+
 namespace AuraNova.API.Controllers
 {
     [Authorize(Roles = "SuperAdmin,Admin")]
+    [EvictCatalogCache]
     [ApiController]
     [Route("api/admin/campaigns")]
     public class CampaignsAdminController : ControllerBase

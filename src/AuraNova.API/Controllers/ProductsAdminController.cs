@@ -10,6 +10,7 @@ using AuraNova.Application.Products.DTOs;
 using AuraNova.Application.Products.Interfaces;
 using AuraNova.Application.Storage.Interfaces;
 using AuraNova.Application.Audit.Interfaces;
+using AuraNova.API.Configuration;
 using AuraNova.API.Extensions;
 
 namespace AuraNova.API.Controllers
@@ -18,6 +19,7 @@ namespace AuraNova.API.Controllers
     [Route("api/admin/products")]
     [Authorize(Roles = "Admin")]
     [EnableRateLimiting("admin_policy")]
+    [EvictCatalogCache]
     public class ProductsAdminController : ControllerBase
     {
         private readonly IProductService _productService;
@@ -113,8 +115,9 @@ namespace AuraNova.API.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest(new { message = "No se ha proporcionado ningún archivo." });
 
-            if (file.Length > 5 * 1024 * 1024)
-                return BadRequest(new { message = "El archivo no debe exceder los 5 MB." });
+            // Se acepta hasta 10 MB porque la imagen se re-comprime a WebP (≈100-300 KB) antes de guardarse.
+            if (file.Length > 10 * 1024 * 1024)
+                return BadRequest(new { message = "El archivo no debe exceder los 10 MB." });
 
             var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
             if (string.IsNullOrEmpty(ext)) ext = ".jpg"; // fallback
@@ -131,9 +134,9 @@ namespace AuraNova.API.Controllers
 
                 return Ok(new { imageUrl = url });
             }
-            catch (Exception ex)
+            catch (InvalidImageException ex)
             {
-                return StatusCode(500, new { message = "Error interno al subir la imagen.", details = ex.ToString() });
+                return BadRequest(new { message = ex.Message });
             }
         }
     }

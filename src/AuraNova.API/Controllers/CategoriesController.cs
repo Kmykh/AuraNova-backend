@@ -1,10 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
+using AuraNova.API.Configuration;
 using AuraNova.Application.Categories.Interfaces;
 
 namespace AuraNova.API.Controllers
 {
     [ApiController]
     [Route("api/categories")]
+    [OutputCache(PolicyName = CatalogCache.Policy)]
+    [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any)]
     public class CategoriesController(ICategoryService categoryService) : ControllerBase
     {
         [HttpGet]

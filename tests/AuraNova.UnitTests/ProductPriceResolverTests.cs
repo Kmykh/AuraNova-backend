@@ -220,5 +220,36 @@ namespace AuraNova.UnitTests
             Assert.False(result.IsCampaignPrice);
             Assert.Equal(50m, result.EffectivePrice);
         }
+            [Fact]
+        public async Task ResolvePricesAsync_MixedProducts_ResolvesEachInBatch()
+        {
+            using var db = GetInMemoryDb();
+            var regular = new Product { Id = Guid.NewGuid(), Name = "Regular", Price = 30m, IsAvailable = true, Stock = 5 };
+            var onCampaign = new Product { Id = Guid.NewGuid(), Name = "Campaña", Price = 50m, IsAvailable = true, Stock = 5 };
+            db.Products.AddRange(regular, onCampaign);
+
+            var campaign = new Campaign { Id = Guid.NewGuid(), Name = "Flores Amarillas", StartDate = DateTimeOffset.UtcNow.AddDays(-1), EndDate = DateTimeOffset.UtcNow.AddDays(10), IsActive = true };
+            var stage = new CampaignStage { Id = Guid.NewGuid(), CampaignId = campaign.Id, Name = "Preventa", StartDate = DateTimeOffset.UtcNow.AddDays(-1), EndDate = DateTimeOffset.UtcNow.AddDays(10), IsActive = true };
+            var campaignProduct = new CampaignProduct { Id = Guid.NewGuid(), CampaignId = campaign.Id, ProductId = onCampaign.Id, IsActive = true };
+            db.Campaigns.Add(campaign);
+            db.CampaignStages.Add(stage);
+            db.CampaignProducts.Add(campaignProduct);
+            db.CampaignProductStagePrices.Add(new CampaignProductStagePrice { Id = Guid.NewGuid(), CampaignProductId = campaignProduct.Id, CampaignStageId = stage.Id, Price = 42m });
+            await db.SaveChangesAsync();
+
+            var resolver = new ProductPriceResolver(db, new NullLogger<ProductPriceResolver>());
+            var missingId = Guid.NewGuid();
+
+            var results = await resolver.ResolvePricesAsync(new[] { regular.Id, onCampaign.Id, missingId });
+
+            Assert.Equal(2, results.Count);
+            Assert.False(results[regular.Id].IsCampaignPrice);
+            Assert.Equal(30m, results[regular.Id].EffectivePrice);
+            Assert.True(results[onCampaign.Id].IsCampaignPrice);
+            Assert.Equal(42m, results[onCampaign.Id].EffectivePrice);
+            Assert.Equal(50m, results[onCampaign.Id].ProductBasePrice);
+            Assert.Equal("Preventa", results[onCampaign.Id].CampaignStageName);
+            Assert.False(results.ContainsKey(missingId));
+        }
     }
 }

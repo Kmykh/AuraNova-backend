@@ -20,11 +20,13 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
 
             builder.HasIndex(c => c.Slug).IsUnique();
 
-            // Seed initial data
+            // Seed initial data. CreatedAt must be a fixed value: DateTimeOffset.UtcNow made every new
+            // migration re-write these rows.
+            var seededAt = new DateTimeOffset(2026, 9, 12, 23, 36, 43, 404, TimeSpan.Zero).AddTicks(7840);
             builder.HasData(
-                new Category { Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), Name = "Flores Eternas", Slug = "flores-eternas", IsActive = true, CreatedAt = DateTimeOffset.UtcNow },
-                new Category { Id = Guid.Parse("22222222-2222-2222-2222-222222222222"), Name = "Accesorios", Slug = "accesorios", IsActive = true, CreatedAt = DateTimeOffset.UtcNow },
-                new Category { Id = Guid.Parse("33333333-3333-3333-3333-333333333333"), Name = "Maceteros", Slug = "maceteros", IsActive = true, CreatedAt = DateTimeOffset.UtcNow }
+                new Category { Id = Guid.Parse("11111111-1111-1111-1111-111111111111"), Name = "Flores Eternas", Slug = "flores-eternas", IsActive = true, CreatedAt = seededAt },
+                new Category { Id = Guid.Parse("22222222-2222-2222-2222-222222222222"), Name = "Accesorios", Slug = "accesorios", IsActive = true, CreatedAt = seededAt },
+                new Category { Id = Guid.Parse("33333333-3333-3333-3333-333333333333"), Name = "Maceteros", Slug = "maceteros", IsActive = true, CreatedAt = seededAt }
             );
         }
     }
