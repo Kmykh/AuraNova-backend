@@ -1,6 +1,7 @@
 using AuraNova.Application.Quotes.DTOs;
 using AuraNova.Application.Quotes.Interfaces;
 using AuraNova.Application.Notifications.Interfaces;
+using AuraNova.Application.Storage.Interfaces;
 using AuraNova.Domain.Entities;
 using AuraNova.Domain.Enums;
 using AuraNova.Infrastructure.Orders;
@@ -16,13 +17,15 @@ namespace AuraNova.Infrastructure.Quotes
         private readonly INotificationService _notificationService;
         private readonly ILogger<QuoteService> _logger;
         private readonly AuraNova.Application.Auth.Interfaces.ICurrentUserService _currentUserService;
+        private readonly IFileStorageService _storage;
 
-        public QuoteService(AppDbContext db, INotificationService notificationService, AuraNova.Application.Auth.Interfaces.ICurrentUserService currentUserService, ILogger<QuoteService> logger)
+        public QuoteService(AppDbContext db, INotificationService notificationService, AuraNova.Application.Auth.Interfaces.ICurrentUserService currentUserService, ILogger<QuoteService> logger, IFileStorageService storage)
         {
             _db = db;
             _notificationService = notificationService;
             _currentUserService = currentUserService;
             _logger = logger;
+            _storage = storage;
         }
 
         public async Task<IReadOnlyList<QuoteResponse>> GetAllAsync()
@@ -33,7 +36,11 @@ namespace AuraNova.Infrastructure.Quotes
                 .OrderByDescending(q => q.CreatedAt)
                 .ToListAsync();
 
-            return quotes.Select(q => MapToResponse(q)).ToList();
+            var imageUrls = await _storage.GetReadUrlsAsync(quotes
+                .Select(q => q.Order?.ReferenceImageUrl)
+                .OfType<string>());
+
+            return quotes.Select(q => MapToResponse(q, imageUrls)).ToList();
         }
 
         public async Task<QuoteResponse?> GetByIdAsync(Guid id)
@@ -45,7 +52,7 @@ namespace AuraNova.Infrastructure.Quotes
 
             if (quote == null) return null;
 
-            return MapToResponse(quote);
+            return await MapToResponseAsync(quote);
         }
 
         public async Task<QuoteResponse> UpdateAsync(Guid id, UpdateQuoteRequest request)
@@ -108,10 +115,17 @@ namespace AuraNova.Infrastructure.Quotes
             // --- Trigger Notification ---
             await _notificationService.NotifyAsync(order.Id, NotificationType.QuoteReady);
 
-            return MapToResponse(quote);
+            return await MapToResponseAsync(quote);
         }
 
-        private QuoteResponse MapToResponse(Quote quote)
+        private async Task<QuoteResponse> MapToResponseAsync(Quote quote)
+        {
+            var imageUrls = await _storage.GetReadUrlsAsync(
+                new[] { quote.Order?.ReferenceImageUrl }.OfType<string>());
+            return MapToResponse(quote, imageUrls);
+        }
+
+        private static QuoteResponse MapToResponse(Quote quote, IReadOnlyDictionary<string, string> imageUrls)
         {
             var order = quote.Order!;
             var response = new QuoteResponse
@@ -131,7 +145,8 @@ namespace AuraNova.Infrastructure.Quotes
                 CustomerName = order.Customer?.Name ?? "",
                 CustomerPhone = order.Customer?.Phone ?? "",
                 IsCustomOrder = order.IsCustomOrder,
-                ReferenceImageUrl = order.ReferenceImageUrl,
+                // Signed URL: reference images live in the private bucket
+                ReferenceImageUrl = order.ReferenceImageUrl == null ? null : imageUrls.GetValueOrDefault(order.ReferenceImageUrl),
                 CustomizationNotes = order.CustomizationNotes,
                 DeliveryType = order.DeliveryType.ToString()
             };

@@ -1,0 +1,12 @@
+{
+  "name": "auranova-export-products",
+  "private": true,
+  "type": "module",
+  "description": "Exporta el catálogo de AuraNova (productos, categorías, campañas e imágenes) para migrar de base de datos.",
+  "scripts": {
+    "export": "node export.mjs"
+  },
+  "dependencies": {
+    "pg": "8.16.3"
+  }
+}

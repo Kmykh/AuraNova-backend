@@ -63,7 +63,7 @@ namespace AuraNova.UnitTests
             var (order, quote) = await SeedOrderWithQuote(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>());
+            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>(), new TestStorage());
 
             var result = await service.UpdateAsync(quote.Id, new UpdateQuoteRequest
             {
@@ -84,7 +84,7 @@ namespace AuraNova.UnitTests
             var (_, quote) = await SeedOrderWithQuote(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>());
+            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>(), new TestStorage());
 
             var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
                 service.UpdateAsync(quote.Id, new UpdateQuoteRequest { ShippingCost = -5.00m }));
@@ -98,7 +98,7 @@ namespace AuraNova.UnitTests
             var (_, quote) = await SeedOrderWithQuote(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>());
+            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>(), new TestStorage());
 
             await service.UpdateAsync(quote.Id, new UpdateQuoteRequest { ShippingCost = 15.00m });
 
@@ -114,7 +114,7 @@ namespace AuraNova.UnitTests
             var (order, quote) = await SeedOrderWithQuote(db);
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>());
+            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>(), new TestStorage());
 
             await service.UpdateAsync(quote.Id, new UpdateQuoteRequest { CustomizationCost = 20.00m });
 
@@ -138,7 +138,7 @@ namespace AuraNova.UnitTests
 
             var notificationService = new Mock<INotificationService>();
             var currentUserService = new Mock<ICurrentUserService>();
-            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>());
+            var service = new QuoteService(db, notificationService.Object, currentUserService.Object, new NullLogger<QuoteService>(), new TestStorage());
 
             var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
                 service.UpdateAsync(quote.Id, new UpdateQuoteRequest { ShippingCost = 20.00m }));

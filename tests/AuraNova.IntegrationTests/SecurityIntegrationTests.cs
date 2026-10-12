@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace AuraNova.IntegrationTests
@@ -11,7 +12,25 @@ namespace AuraNova.IntegrationTests
 
         public SecurityIntegrationTests(WebApplicationFactory<Program> factory)
         {
-            _client = factory.CreateClient();
+            // Isolated from any real database: the default factory used the connection string in appsettings
+            _client = factory.WithWebHostBuilder(builder =>
+            {
+                builder.UseSetting("JwtSettings:SecretKey", "TestSecretKeyForIntegrationTestsMustBeLongEnough123456");
+                builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=test");
+                builder.UseSetting("JwtSettings:Issuer", "Test");
+                builder.UseSetting("JwtSettings:Audience", "Test");
+
+                builder.ConfigureServices(services =>
+                {
+                    var descriptor = System.Linq.Enumerable.SingleOrDefault(services,
+                        d => d.ServiceType == typeof(Microsoft.EntityFrameworkCore.DbContextOptions<AuraNova.Infrastructure.Persistence.AppDbContext>));
+                    if (descriptor != null)
+                        services.Remove(descriptor);
+
+                    services.AddDbContext<AuraNova.Infrastructure.Persistence.AppDbContext>(options =>
+                        Microsoft.EntityFrameworkCore.InMemoryDbContextOptionsExtensions.UseInMemoryDatabase(options, System.Guid.NewGuid().ToString()));
+                });
+            }).CreateClient();
         }
 
         [Fact]

@@ -31,8 +31,13 @@ namespace AuraNova.Infrastructure.Persistence
         public DbSet<CampaignProduct> CampaignProducts { get; set; } = null!;
         public DbSet<CampaignProductStagePrice> CampaignProductStagePrices { get; set; } = null!;
 
+        public const string OrderCodeSequence = "OrderCodeSequence";
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // Correlativo de OrderCode (PED-000001): evita colisiones entre pedidos simultáneos
+            modelBuilder.HasSequence<long>(OrderCodeSequence);
+
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
             base.OnModelCreating(modelBuilder);
         }

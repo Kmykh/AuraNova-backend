@@ -4,6 +4,7 @@ using AuraNova.Application.Payments.Interfaces;
 using AuraNova.Infrastructure.Orders;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using AuraNova.Application.Storage.Interfaces;
 using Microsoft.AspNetCore.RateLimiting;
 using System.IO;
 using System.Linq;
@@ -67,6 +68,10 @@ namespace AuraNova.API.Controllers
                 return NotFound(new { message = ex.Message });
             }
             catch (OrderValidationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (InvalidImageException ex)
             {
                 return BadRequest(new { message = ex.Message });
             }

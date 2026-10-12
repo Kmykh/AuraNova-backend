@@ -89,5 +89,71 @@ namespace AuraNova.Infrastructure.Orders
 
             return defaultResult;
         }
+
+        public async Task<IReadOnlyDictionary<Guid, ProductPriceResolutionResult>> ResolvePricesAsync(IReadOnlyCollection<Guid> productIds, DateTimeOffset? currentDate = null)
+        {
+            if (productIds.Count == 0)
+                return new Dictionary<Guid, ProductPriceResolutionResult>();
+
+            var date = currentDate ?? DateTimeOffset.UtcNow;
+
+            var basePrices = await _db.Products
+                .AsNoTracking()
+                .Where(p => productIds.Contains(p.Id))
+                .Select(p => new { p.Id, p.Price })
+                .ToDictionaryAsync(p => p.Id, p => p.Price);
+
+            // Same rules as ResolvePriceAsync, for all products at once
+            var campaignPrices = await _db.CampaignProductStagePrices
+                .AsNoTracking()
+                .Where(sp =>
+                    sp.CampaignStage!.IsActive &&
+                    sp.CampaignStage.StartDate <= date &&
+                    sp.CampaignStage.EndDate >= date &&
+                    sp.CampaignProduct!.IsActive &&
+                    productIds.Contains(sp.CampaignProduct.ProductId) &&
+                    sp.CampaignProduct.Campaign!.IsActive &&
+                    sp.CampaignProduct.Campaign.StartDate <= date &&
+                    sp.CampaignProduct.Campaign.EndDate >= date
+                )
+                .Select(sp => new
+                {
+                    sp.CampaignProduct!.ProductId,
+                    sp.Price,
+                    sp.CampaignStageId,
+                    CampaignStageName = sp.CampaignStage!.Name,
+                    CampaignId = sp.CampaignProduct!.CampaignId,
+                    CampaignName = sp.CampaignProduct!.Campaign!.Name
+                })
+                .ToListAsync();
+
+            var campaignByProduct = campaignPrices
+                .GroupBy(cp => cp.ProductId)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var results = new Dictionary<Guid, ProductPriceResolutionResult>(basePrices.Count);
+            foreach (var (productId, basePrice) in basePrices)
+            {
+                results[productId] = campaignByProduct.TryGetValue(productId, out var campaign)
+                    ? new ProductPriceResolutionResult
+                    {
+                        ProductBasePrice = basePrice,
+                        EffectivePrice = campaign.Price,
+                        IsCampaignPrice = true,
+                        CampaignId = campaign.CampaignId,
+                        CampaignName = campaign.CampaignName,
+                        CampaignStageId = campaign.CampaignStageId,
+                        CampaignStageName = campaign.CampaignStageName
+                    }
+                    : new ProductPriceResolutionResult
+                    {
+                        ProductBasePrice = basePrice,
+                        EffectivePrice = basePrice,
+                        IsCampaignPrice = false
+                    };
+            }
+
+            return results;
+        }
     }
 }

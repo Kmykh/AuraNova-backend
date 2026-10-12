@@ -23,7 +23,7 @@ namespace AuraNova.UnitTests
                 .Options;
 
             _db = new AppDbContext(options);
-            _service = new AdminOrderQueryService(_db);
+            _service = new AdminOrderQueryService(_db, new TestStorage());
         }
 
         public void Dispose()

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using AuraNova.Application.Orders;
 using AuraNova.Application.Orders.DTOs;
 using AuraNova.Application.Orders.Interfaces;
+using AuraNova.Application.Storage.Interfaces;
 using AuraNova.Domain.Entities;
 using AuraNova.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -13,15 +14,18 @@ namespace AuraNova.Infrastructure.Orders
     public class OrderTrackingService : IOrderTrackingService
     {
         private readonly AppDbContext _db;
+        private readonly IFileStorageService _storage;
 
-        public OrderTrackingService(AppDbContext db)
+        public OrderTrackingService(AppDbContext db, IFileStorageService storage)
         {
             _db = db;
+            _storage = storage;
         }
 
         public async Task<PublicTrackingResponse?> GetTrackingAsync(string orderCode, string trackingToken)
         {
             var order = await _db.Orders
+                .AsNoTracking()
                 .Include(o => o.Customer)
                 .Include(o => o.StatusHistory)
                 .Include(o => o.Items!)
@@ -61,6 +65,11 @@ namespace AuraNova.Infrastructure.Orders
                 };
             }).ToList();
 
+            // Only the owner (order code + token) gets these signed, short-lived URLs
+            var fileUrls = await _storage.GetReadUrlsAsync(
+                new[] { order.ReferenceImageUrl, order.ShippingProofUrl }.OfType<string>());
+            string? FileUrl(string? stored) => stored == null ? null : fileUrls.GetValueOrDefault(stored);
+
             string? customerFirstName = null;
             if (!string.IsNullOrWhiteSpace(order.Customer?.Name))
             {
@@ -76,7 +85,7 @@ namespace AuraNova.Infrastructure.Orders
                 DeliveryType = order.DeliveryType.ToString(),
                 
                 IsCustomOrder = order.IsCustomOrder,
-                ReferenceImageUrl = order.ReferenceImageUrl,
+                ReferenceImageUrl = FileUrl(order.ReferenceImageUrl),
                 CustomizationNotes = order.CustomizationNotes,
                 Notes = order.Notes,
 
@@ -99,7 +108,7 @@ namespace AuraNova.Infrastructure.Orders
                 {
                     Provider = order.ShippingProvider,
                     TrackingCode = order.ShippingTrackingCode,
-                    ProofUrl = order.ShippingProofUrl
+                    ProofUrl = FileUrl(order.ShippingProofUrl)
                 } : null,
 
                 Timeline = timeline,

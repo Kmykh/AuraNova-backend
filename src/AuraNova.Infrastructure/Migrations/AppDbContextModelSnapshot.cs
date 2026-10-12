@@ -22,6 +22,8 @@ namespace AuraNova.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("OrderCodeSequence");
+
             modelBuilder.Entity("AuraNova.Domain.Entities.AdminAuditLog", b =>
                 {
                     b.Property<Guid>("Id")

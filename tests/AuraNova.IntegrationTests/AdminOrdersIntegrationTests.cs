@@ -21,6 +21,7 @@ namespace AuraNova.IntegrationTests
             return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             {
                 builder.UseSetting("JwtSettings:SecretKey", "TestSecretKeyForIntegrationTestsMustBeLongEnough123456");
+                builder.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=test");
                 builder.UseSetting("JwtSettings:Issuer", "Test");
                 builder.UseSetting("JwtSettings:Audience", "Test");
                 

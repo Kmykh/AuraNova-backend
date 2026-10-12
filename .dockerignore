@@ -10,3 +10,8 @@ tests
 secrets
 appsettings.*local*.json
 node_modules
+
+# Local secrets
+.env
+.env.*
+!.env.example

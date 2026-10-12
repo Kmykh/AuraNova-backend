@@ -1,10 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
+using AuraNova.API.Configuration;
 using AuraNova.Application.Products.Interfaces;
 
 namespace AuraNova.API.Controllers
 {
     [ApiController]
     [Route("api/products")]
+    [OutputCache(PolicyName = CatalogCache.Policy)]
+    [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any)]
     public class ProductsController : ControllerBase
     {
         private readonly IProductService _productService;

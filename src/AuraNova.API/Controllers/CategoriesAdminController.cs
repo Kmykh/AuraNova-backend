@@ -5,11 +5,14 @@ using AuraNova.Application.Categories.Interfaces;
 using AuraNova.Application.Audit.Interfaces;
 using AuraNova.API.Extensions;
 
+using AuraNova.API.Configuration;
+
 namespace AuraNova.API.Controllers
 {
     [ApiController]
     [Route("api/admin/categories")]
     [Authorize(Roles = "Admin")]
+    [EvictCatalogCache]
     [EnableRateLimiting("admin_policy")]
     public class CategoriesAdminController(
         ICategoryService categoryService,

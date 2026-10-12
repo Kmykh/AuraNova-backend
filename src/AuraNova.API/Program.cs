@@ -4,6 +4,10 @@ using AuraNova.API.Middlewares;
 using AuraNova.API.Configuration;
 using System.Text.Json.Serialization;
 
+// Local development: load the repo's .env (only for the API itself and `dotnet ef`, never under the test host)
+if (System.Reflection.Assembly.GetEntryAssembly()?.GetName().Name is "AuraNova.API" or "ef")
+    DotEnv.Load();
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -46,10 +50,8 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// Database
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-if (string.IsNullOrWhiteSpace(connectionString))
-    throw new InvalidOperationException("Connection string 'DefaultConnection' not found. Configure it in appsettings or user secrets.");
+// Database: appsettings "Database" section + Database:Password (env var / .env)
+var connectionString = DatabaseConnection.Resolve(builder.Configuration);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString)
@@ -133,7 +135,24 @@ builder.Services.AddScoped<AuraNova.Application.WhatsApp.Interfaces.IWhatsAppMes
 builder.Services.Configure<AuraNova.Infrastructure.Storage.SupabaseSettings>(builder.Configuration.GetSection("Supabase"));
 
 // register storage services
-builder.Services.AddHttpClient<AuraNova.Application.Storage.Interfaces.IFileStorageService, AuraNova.Infrastructure.Storage.SupabaseStorageService>();
+// SupabaseStorageService sube los archivos tal cual; el decorador OptimizingFileStorageService valida y convierte
+// toda imagen a WebP optimizado antes de subirla. El resto de la app solo ve IFileStorageService (decorado).
+builder.Services.AddHttpClient<AuraNova.Infrastructure.Storage.SupabaseStorageService>();
+builder.Services.AddSingleton<AuraNova.Application.Storage.Interfaces.IImageOptimizer, AuraNova.Infrastructure.Storage.SkiaImageOptimizer>();
+builder.Services.AddSingleton<AuraNova.Application.Storage.Interfaces.IStorageUrlResolver, AuraNova.Infrastructure.Storage.StorageUrlResolver>();
+builder.Services.AddScoped<AuraNova.Application.Storage.Interfaces.IFileStorageService>(sp =>
+    new AuraNova.Infrastructure.Storage.OptimizingFileStorageService(
+        sp.GetRequiredService<AuraNova.Infrastructure.Storage.SupabaseStorageService>(),
+        sp.GetRequiredService<AuraNova.Application.Storage.Interfaces.IImageOptimizer>(),
+        sp.GetRequiredService<ILogger<AuraNova.Infrastructure.Storage.OptimizingFileStorageService>>()));
+builder.Services.AddScoped<AuraNova.Application.Storage.Interfaces.IReferenceImageService, AuraNova.Infrastructure.Storage.ReferenceImageService>();
+builder.Services.AddScoped<AuraNova.Application.Storage.Interfaces.IImageMaintenanceService>(sp =>
+    new AuraNova.Infrastructure.Storage.ImageMaintenanceService(
+        sp.GetRequiredService<AppDbContext>(),
+        sp.GetRequiredService<AuraNova.Infrastructure.Storage.SupabaseStorageService>(), // sin decorador: evita doble compresión
+        sp.GetRequiredService<AuraNova.Application.Storage.Interfaces.IImageOptimizer>(),
+        sp.GetRequiredService<AuraNova.Application.Storage.Interfaces.IReferenceImageService>(),
+        sp.GetRequiredService<ILogger<AuraNova.Infrastructure.Storage.ImageMaintenanceService>>()));
 
 // register payment services
 builder.Services.AddScoped<AuraNova.Application.Payments.Interfaces.IPaymentService, AuraNova.Infrastructure.Payments.PaymentService>();
@@ -143,6 +162,11 @@ builder.Services.AddSingleton<AuraNova.Application.Orders.Interfaces.IOrderStatu
 
 // register order status service
 builder.Services.AddScoped<AuraNova.Application.Orders.Interfaces.IOrderStatusService, AuraNova.Infrastructure.Orders.OrderStatusService>();
+
+// Optional auto-cancellation of unpaid catalog orders (releases stock). Disabled unless Orders:UnpaidExpirationHours > 0
+builder.Services.Configure<AuraNova.Infrastructure.Orders.OrderExpirationSettings>(builder.Configuration.GetSection("Orders"));
+builder.Services.AddScoped<AuraNova.Infrastructure.Orders.UnpaidOrderExpirationService>();
+builder.Services.AddHostedService<AuraNova.API.Services.UnpaidOrderExpirationWorker>();
 
 // register public tracking service
 builder.Services.AddScoped<AuraNova.Application.Orders.Interfaces.IOrderTrackingService, AuraNova.Infrastructure.Orders.OrderTrackingService>();
@@ -194,7 +218,29 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Rate Limiting
+// Real client IP behind Render's proxy. Without this RemoteIpAddress is the proxy for every request,
+// so per-IP rate limits would still be shared by everyone.
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                               | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = securitySettings.ForwardedHeadersForwardLimit;
+    // The API is only reachable through the platform proxy
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// Rate Limiting (partitioned per client IP, or per admin user)
+static Microsoft.AspNetCore.RateLimiting.RateLimiterOptions AddPerClientWindow(
+    Microsoft.AspNetCore.RateLimiting.RateLimiterOptions options, string policy, int permitLimit, TimeSpan window,
+    Func<HttpContext, string> partitionKey)
+{
+    options.AddPolicy(policy, context => System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey(context),
+        _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions { PermitLimit = permitLimit, Window = window }));
+    return options;
+}
+
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -210,12 +256,25 @@ builder.Services.AddRateLimiter(options =>
         }, cancellationToken: token);
     };
 
-    options.AddFixedWindowLimiter("login_policy", opt => { opt.PermitLimit = 5; opt.Window = TimeSpan.FromMinutes(1); });
-    options.AddFixedWindowLimiter("tracking_policy", opt => { opt.PermitLimit = 30; opt.Window = TimeSpan.FromMinutes(1); });
-    options.AddFixedWindowLimiter("create_order_policy", opt => { opt.PermitLimit = 20; opt.Window = TimeSpan.FromMinutes(1); });
-    options.AddFixedWindowLimiter("evidence_upload_policy", opt => { opt.PermitLimit = 5; opt.Window = TimeSpan.FromMinutes(10); });
-    options.AddFixedWindowLimiter("accept_quote_policy", opt => { opt.PermitLimit = 10; opt.Window = TimeSpan.FromMinutes(1); });
-    options.AddFixedWindowLimiter("admin_policy", opt => { opt.PermitLimit = 100; opt.Window = TimeSpan.FromMinutes(1); });
+    string ByIp(HttpContext context) => ClientIp.Resolve(context, securitySettings.ClientIpHeader);
+    string ByUserOrIp(HttpContext context) => ClientIp.ResolveUserOrIp(context, securitySettings.ClientIpHeader);
+
+    AddPerClientWindow(options, "login_policy", 5, TimeSpan.FromMinutes(1), ByIp);
+    // The tracking page polls every 15s; several customers can share a mobile carrier IP (CGNAT)
+    AddPerClientWindow(options, "tracking_policy", 60, TimeSpan.FromMinutes(1), ByIp);
+    AddPerClientWindow(options, "create_order_policy", 15, TimeSpan.FromMinutes(1), ByIp);
+    AddPerClientWindow(options, "evidence_upload_policy", 5, TimeSpan.FromMinutes(10), ByIp);
+    AddPerClientWindow(options, "accept_quote_policy", 10, TimeSpan.FromMinutes(1), ByIp);
+    AddPerClientWindow(options, "admin_policy", 200, TimeSpan.FromMinutes(1), ByUserOrIp);
+});
+
+// Output cache for the public catalog (invalidated by [EvictCatalogCache] on admin writes)
+builder.Services.AddOutputCache(options =>
+{
+    options.AddPolicy(CatalogCache.Policy, policy => policy
+        .Expire(CatalogCache.Duration)
+        .SetVaryByRouteValue("id")
+        .Tag(CatalogCache.Tag));
 });
 
 // Exception Handler and Problem Details
@@ -246,10 +305,12 @@ app.UseHttpsRedirection();
 app.UseMiddleware<SecurityHeadersMiddleware>();
 
 app.UseCors();
-app.UseRateLimiter();
 
 app.UseAuthentication();
+// After authentication so admin_policy can partition by user
+app.UseRateLimiter();
 app.UseAuthorization();
+app.UseOutputCache();
 
 app.MapHealthChecks("/api/health");
 app.MapHealthChecks("/health");
@@ -261,7 +322,9 @@ app.MapHub<AuraNova.API.Hubs.SuperAdminLiveHub>("/hubs/live");
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    // Integration tests use the InMemory provider, which has no migrations
+    if (db.Database.IsRelational())
+        db.Database.Migrate();
 }
 
 // Initial admin bootstrap

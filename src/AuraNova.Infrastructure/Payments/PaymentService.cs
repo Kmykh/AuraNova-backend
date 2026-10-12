@@ -111,7 +111,9 @@ namespace AuraNova.Infrastructure.Payments
                 // --- Trigger Notification ---
                 await _notificationService.NotifyAsync(order.Id, NotificationType.PaymentReported);
 
-                return MapToResponse(payment, order);
+                var response = MapToResponse(payment, order);
+                response.EvidenceUrl = await _storageService.GetReadUrlAsync(payment.EvidenceUrl);
+                return response;
             }
             catch (Exception ex)
             {
@@ -130,7 +132,7 @@ namespace AuraNova.Infrastructure.Payments
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
 
-            return payments.Select(MapToAdminResponse).ToList();
+            return await MapToAdminResponsesAsync(payments);
         }
 
         public async Task<IReadOnlyList<AdminPaymentResponse>> GetPendingAdminPaymentsAsync()
@@ -142,7 +144,7 @@ namespace AuraNova.Infrastructure.Payments
                 .OrderByDescending(p => p.UpdatedAt)
                 .ToListAsync();
 
-            return payments.Select(MapToAdminResponse).ToList();
+            return await MapToAdminResponsesAsync(payments);
         }
 
         public async Task<AdminPaymentResponse?> GetAdminPaymentByIdAsync(Guid paymentId)
@@ -152,7 +154,7 @@ namespace AuraNova.Infrastructure.Payments
                     .ThenInclude(o => o.Customer)
                 .FirstOrDefaultAsync(p => p.Id == paymentId);
 
-            return payment == null ? null : MapToAdminResponse(payment);
+            return payment == null ? null : (await MapToAdminResponsesAsync([payment]))[0];
         }
 
         public async Task<bool> ConfirmAsync(Guid paymentId)
@@ -249,6 +251,21 @@ namespace AuraNova.Infrastructure.Payments
                 UpdatedAt = payment.UpdatedAt,
                 VerifiedAt = payment.VerifiedAt
             };
+        }
+
+        /// <summary>
+        /// Comprobantes en el bucket privado: se devuelven URLs firmadas y temporales (una sola llamada por lista).
+        /// </summary>
+        private async Task<IReadOnlyList<AdminPaymentResponse>> MapToAdminResponsesAsync(IReadOnlyCollection<Payment> payments)
+        {
+            var evidenceUrls = await _storageService.GetReadUrlsAsync(payments.Select(p => p.EvidenceUrl).OfType<string>());
+
+            return payments.Select(payment =>
+            {
+                var response = MapToAdminResponse(payment);
+                response.EvidenceUrl = payment.EvidenceUrl == null ? null : evidenceUrls.GetValueOrDefault(payment.EvidenceUrl);
+                return response;
+            }).ToList();
         }
 
         private static AdminPaymentResponse MapToAdminResponse(Payment payment)

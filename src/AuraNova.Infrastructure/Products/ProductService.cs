@@ -1,6 +1,7 @@
 using AuraNova.Application.Categories.DTOs;
 using AuraNova.Application.Products.DTOs;
 using AuraNova.Application.Products.Interfaces;
+using AuraNova.Application.Storage.Interfaces;
 using AuraNova.Domain.Entities;
 using AuraNova.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -13,13 +14,16 @@ namespace AuraNova.Infrastructure.Products
         private readonly AppDbContext _db;
         private readonly ILogger<ProductService> _logger; // IDE refresh trigger
         private readonly AuraNova.Application.Orders.Interfaces.IProductPriceResolver _priceResolver;
+        private readonly IFileStorageService _storage;
 
         public ProductService(AppDbContext db, ILogger<ProductService> logger,
-            AuraNova.Application.Orders.Interfaces.IProductPriceResolver priceResolver)
+            AuraNova.Application.Orders.Interfaces.IProductPriceResolver priceResolver,
+            IFileStorageService storage)
         {
             _db = db;
             _logger = logger;
             _priceResolver = priceResolver;
+            _storage = storage;
         }
 
         public async Task<ProductResponse> CreateAsync(CreateProductRequest request)
@@ -61,6 +65,7 @@ namespace AuraNova.Infrastructure.Products
         public async Task<IReadOnlyList<ProductResponse>> GetAdminProductsAsync()
         {
             var products = await _db.Products
+                .AsNoTracking()
                 .Include(p => p.Category)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
@@ -89,6 +94,8 @@ namespace AuraNova.Infrastructure.Products
                 }
             }
 
+            var previousImageUrl = product.ImageUrl;
+
             product.Name = request.Name.Trim();
             product.Description = request.Description?.Trim();
             product.Price = request.Price;
@@ -106,6 +113,9 @@ namespace AuraNova.Infrastructure.Products
             await _db.SaveChangesAsync();
 
             _logger.LogInformation("Producto actualizado: {ProductId}", id);
+
+            if (!string.IsNullOrWhiteSpace(previousImageUrl) && previousImageUrl != product.ImageUrl)
+                await DeleteImageIfUnusedAsync(previousImageUrl);
 
             return MapToResponse(product, null);
         }
@@ -148,29 +158,45 @@ namespace AuraNova.Infrastructure.Products
         public async Task<IReadOnlyList<ProductResponse>> GetPublicProductsAsync()
         {
             var products = await _db.Products
+                .AsNoTracking()
                 .Include(p => p.Category)
                 .Where(p => p.IsAvailable)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
 
-            var responses = new List<ProductResponse>();
-            foreach (var product in products)
-            {
-                var priceResult = await _priceResolver.ResolvePriceAsync(product.Id);
-                responses.Add(MapToResponse(product, priceResult));
-            }
+            var prices = await _priceResolver.ResolvePricesAsync(products.Select(p => p.Id).ToList());
 
-            return responses.AsReadOnly();
+            return products
+                .Select(p => MapToResponse(p, prices.GetValueOrDefault(p.Id)))
+                .ToList()
+                .AsReadOnly();
         }
 
         public async Task<ProductResponse?> GetPublicByIdAsync(Guid id)
         {
-            var product = await _db.Products.Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id);
+            var product = await _db.Products.AsNoTracking().Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id);
             if (product == null || !product.IsAvailable)
                 return null;
 
             var priceResult = await _priceResolver.ResolvePriceAsync(product.Id);
             return MapToResponse(product, priceResult);
+        }
+
+        /// <summary>
+        /// Borra del bucket la imagen reemplazada si ya ningún producto la usa (evita archivos huérfanos).
+        /// Solo gestiona archivos subidos por el panel (carpeta products/).
+        /// </summary>
+        private async Task DeleteImageIfUnusedAsync(string imagePath)
+        {
+            if (!imagePath.StartsWith("products/", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var stillUsed = await _db.Products.AnyAsync(p => p.ImageUrl == imagePath);
+            if (stillUsed)
+                return;
+
+            await _storage.DeleteAsync(imagePath);
+            _logger.LogInformation("Imagen anterior eliminada del storage: {Path}", imagePath);
         }
 
         private static ProductResponse MapToResponse(Product product,

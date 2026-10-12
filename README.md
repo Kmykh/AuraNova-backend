@@ -22,12 +22,16 @@ Todas las dependencias están actualizadas y no se han encontrado paquetes vulne
 
 ## 3. Configuración Local y Secretos
 
-El repositorio no versiona secretos de producción ni conexiones a Supabase reales. Para ejecutar localmente, se recomienda utilizar **User Secrets**:
+El repositorio no versiona secretos. Host, puerto, base y usuario de PostgreSQL están en `src/AuraNova.API/appsettings.json` (sección `Database`); **la contraseña es lo único que se configura aparte**.
 
+Para ejecutar localmente:
 ```bash
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=aws-0-us-west-2.pooler.supabase.com;Database=postgres;Username=...;Password=...;SSL Mode=Require;Trust Server Certificate=true" --project src/AuraNova.API
-dotnet user-secrets set "JwtSettings:SecretKey" "your_super_secret_key_here" --project src/AuraNova.API
+cp .env.example .env      # el .env está en .gitignore y .dockerignore
+# completar en .env: Database__Password=...  (y Supabase__ServiceRoleKey si vas a subir archivos)
+dotnet user-secrets set "JwtSettings:SecretKey" "una_clave_larga_de_al_menos_32_caracteres" --project src/AuraNova.API
+dotnet run --project src/AuraNova.API
 ```
+La API lee el `.env` de la raíz solo al ejecutarse localmente (`dotnet run` o `dotnet ef`). Las variables de entorno reales tienen prioridad y los valores vacíos se ignoran. Si se define `ConnectionStrings__DefaultConnection`, reemplaza a la sección `Database` completa.
 
 Para aplicar las migraciones a una base de datos recién creada:
 ```bash
@@ -46,7 +50,9 @@ El backend está diseñado nativamente para desplegarse en [Railway](https://rai
 
 | Variable | Descripción | Ejemplo |
 |----------|-------------|---------|
-| `ConnectionStrings__DefaultConnection` | Cadena de conexión de PostgreSQL (Supabase). | `Host=aws-0-us-west-2...` |
+| `ASPNETCORE_ENVIRONMENT` | Debe ser `Production` (con `Development` se expone Swagger). | `Production` |
+| `Database__Password` | Contraseña de PostgreSQL. El resto de la conexión está en `appsettings.json`. | `********` |
+| `Supabase__Url` / `Supabase__ServiceRoleKey` | Storage (bucket público del catálogo y bucket privado `customer-files`). | `https://<proyecto>.supabase.co` |
 | `JwtSettings__SecretKey` | Clave secreta larga para firmar JWTs. | `sUpEr_S3cr3t_...` |
 | `JwtSettings__Issuer` | Emisor del token. | `AuraNova.API` |
 | `JwtSettings__Audience` | Audiencia del token. | `AuraNova.Admin` |

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using AuraNova.Application.Orders.DTOs;
 using AuraNova.Application.Orders.Interfaces;
+using AuraNova.Application.Storage.Interfaces;
+using AuraNova.API.Configuration;
 using AuraNova.Infrastructure.Orders;
 
 namespace AuraNova.API.Controllers
@@ -10,10 +12,12 @@ namespace AuraNova.API.Controllers
     public class OrdersController : ControllerBase
     {
         private readonly IOrderService _orderService;
+        private readonly IReferenceImageService _referenceImages;
 
-        public OrdersController(IOrderService orderService)
+        public OrdersController(IOrderService orderService, IReferenceImageService referenceImages)
         {
             _orderService = orderService;
+            _referenceImages = referenceImages;
         }
 
         /// <summary>
@@ -22,6 +26,7 @@ namespace AuraNova.API.Controllers
         /// </summary>
         [HttpPost]
         [EnableRateLimiting("create_order_policy")]
+        [EvictCatalogCache] // el pedido descuenta stock, que se muestra en el catálogo
         public async Task<IActionResult> Create([FromBody] CreateOrderRequest request)
         {
             if (!ModelState.IsValid)
@@ -54,8 +59,15 @@ namespace AuraNova.API.Controllers
 
             try
             {
+                // El frontend envía la imagen como data URL base64: se guarda en el storage y en BD solo la ruta.
+                request.ReferenceImageUrl = await _referenceImages.PersistAsync(request.ReferenceImageUrl, HttpContext.RequestAborted);
+
                 var result = await _orderService.CreateCustomAsync(request);
                 return StatusCode(201, result);
+            }
+            catch (InvalidImageException ex)
+            {
+                return BadRequest(new { message = ex.Message });
             }
             catch (OrderNotFoundException ex)
             {
