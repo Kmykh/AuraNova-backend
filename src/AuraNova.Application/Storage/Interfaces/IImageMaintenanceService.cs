@@ -18,6 +18,13 @@ namespace AuraNova.Application.Storage.Interfaces
         /// (comprobantes de pago, constancias de envío e imágenes de referencia) y borra la copia pública.
         /// </summary>
         Task<ImageMaintenanceReport> MovePrivateFilesAsync(bool dryRun, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Borra de products/ los archivos que ningún producto usa (imágenes reemplazadas, originales ya convertidos).
+        /// No toca archivos subidos en las últimas <paramref name="minAgeHours"/> horas: pueden ser de un producto
+        /// que se está editando y aún no se guardó.
+        /// </summary>
+        Task<ImageMaintenanceReport> CleanupOrphanProductImagesAsync(bool dryRun, int minAgeHours = 24, CancellationToken cancellationToken = default);
     }
 
     public class ImageMaintenanceReport

@@ -35,5 +35,7 @@ namespace AuraNova.Infrastructure.Storage
 
         public Task<IReadOnlyDictionary<string, string>> GetReadUrlsAsync(IEnumerable<string> storedPaths) =>
             inner.GetReadUrlsAsync(storedPaths);
+
+        public Task<IReadOnlyList<StoredFileInfo>> ListAsync(string folder) => inner.ListAsync(folder);
     }
 }
