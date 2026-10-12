@@ -36,9 +36,17 @@ namespace AuraNova.Domain.Entities
 
         // Custom Order Fields
         public bool IsCustomOrder { get; set; } = false;
+        /// <summary>Primera imagen de referencia (compatibilidad); todas están en <see cref="ReferenceImages"/>.</summary>
         public string? ReferenceImageUrl { get; set; }
         public string? CustomizationNotes { get; set; }
         public decimal CustomizationCost { get; set; }
+
+        // Brief of the custom order: what the customer wants and when
+        public ICollection<OrderReferenceImage>? ReferenceImages { get; set; }
+        public List<string> ReferenceLinks { get; set; } = new List<string>();
+        public DateOnly? DesiredDate { get; set; }
+        public string? Occasion { get; set; }
+        public string? BudgetRange { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }
@@ -65,17 +73,7 @@ namespace AuraNova.Domain.Entities
             Id = Guid.NewGuid();
             CreatedAt = DateTimeOffset.UtcNow;
             Status = OrderStatus.WaitingQuote;
-            TrackingToken = GenerateTrackingToken();
-        }
-
-        /// <summary>
-        /// Generates a cryptographically secure, URL-safe tracking token (32 bytes → Base64Url).
-        /// </summary>
-        private static string GenerateTrackingToken()
-        {
-            // Generates an 8-character token formatted as XXXX-XXXX
-            var token = Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper();
-            return $"{token.Substring(0, 4)}-{token.Substring(4, 4)}";
+            TrackingToken = OrderCodes.NewTrackingCode();
         }
     }
 }

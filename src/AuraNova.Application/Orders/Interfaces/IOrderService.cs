@@ -5,7 +5,8 @@ namespace AuraNova.Application.Orders.Interfaces
     public interface IOrderService
     {
         Task<CreateOrderResponse> CreateAsync(CreateOrderRequest request);
-        Task<CreateOrderResponse> CreateCustomAsync(CreateCustomOrderRequest request);
+        /// <param name="referenceImagePaths">Rutas ya subidas al storage por el controlador (nunca enviadas por el cliente).</param>
+        Task<CreateOrderResponse> CreateCustomAsync(CreateCustomOrderRequest request, IReadOnlyList<string>? referenceImagePaths = null);
         Task CancelAsync(Guid id, string reason);
         
         // Administrative actions

@@ -22,6 +22,13 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public string? ReferenceImageUrl { get; set; }
         public string? CustomizationNotes { get; set; }
 
+        // Custom order brief (signed URLs for the images)
+        public List<string> ReferenceImages { get; set; } = new();
+        public List<string> ReferenceLinks { get; set; } = new();
+        public DateOnly? DesiredDate { get; set; }
+        public string? Occasion { get; set; }
+        public string? BudgetRange { get; set; }
+
         // Timing
         public DateTimeOffset? StartedAt { get; set; }
         public DateTimeOffset? EstimatedReadyAt { get; set; }

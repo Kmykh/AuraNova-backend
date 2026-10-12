@@ -8,5 +8,8 @@ namespace AuraNova.Application.Storage.Interfaces
         /// </summary>
         /// <exception cref="InvalidImageException">El valor no es una imagen válida o excede el tamaño permitido.</exception>
         Task<string?> PersistAsync(string? reference, CancellationToken cancellationToken = default);
+
+        /// <summary>Sube un archivo de imagen enviado por el formulario (multipart) y devuelve su ruta.</summary>
+        Task<string> PersistFileAsync(Stream content, string contentType, CancellationToken cancellationToken = default);
     }
 }

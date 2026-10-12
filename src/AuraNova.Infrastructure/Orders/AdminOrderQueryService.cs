@@ -120,14 +120,15 @@ namespace AuraNova.Infrastructure.Orders
                 .Include(o => o.Payment)
                 .Include(o => o.StatusHistory)
                 .Include(o => o.Notifications)
+                .Include(o => o.ReferenceImages)
                 .FirstOrDefaultAsync(o => o.Id == id);
 
             if (order == null)
                 return null;
 
             // Customer files (reference, shipping proof, payment evidence) are private: signed, short-lived URLs
-            var fileUrls = await _storage.GetReadUrlsAsync(
-                new[] { order.ReferenceImageUrl, order.ShippingProofUrl, order.Payment?.EvidenceUrl }.OfType<string>());
+            var fileUrls = await _storage.GetReadUrlsAsync(CustomOrderBrief.StoredPaths(order)
+                .Concat(new[] { order.ReferenceImageUrl, order.ShippingProofUrl, order.Payment?.EvidenceUrl }.OfType<string>()));
             string? FileUrl(string? stored) => stored == null ? null : fileUrls.GetValueOrDefault(stored);
 
             var response = new AdminOrderDetailResponse
@@ -147,6 +148,11 @@ namespace AuraNova.Infrastructure.Orders
                 IsCustomOrder = order.IsCustomOrder,
                 ReferenceImageUrl = FileUrl(order.ReferenceImageUrl),
                 CustomizationNotes = order.CustomizationNotes,
+                ReferenceImages = CustomOrderBrief.ImageUrls(order, fileUrls),
+                ReferenceLinks = order.ReferenceLinks ?? [],
+                DesiredDate = order.DesiredDate,
+                Occasion = order.Occasion,
+                BudgetRange = order.BudgetRange,
                 StartedAt = order.StartedAt,
                 EstimatedReadyAt = order.EstimatedReadyAt,
                 ReadyAt = order.ReadyAt,

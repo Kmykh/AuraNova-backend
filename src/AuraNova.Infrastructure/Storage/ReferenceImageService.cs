@@ -48,5 +48,14 @@ namespace AuraNova.Infrastructure.Storage
             using var stream = new MemoryStream(bytes);
             return await storage.UploadAsync(stream, "reference.jpg", mimeType, Folder);
         }
+
+        public async Task<string> PersistFileAsync(Stream content, string contentType, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(contentType) || !contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidImageException("Solo se aceptan imágenes (JPG, PNG o WEBP).");
+
+            // El decorador de storage valida el contenido real y lo convierte a WebP sin metadatos
+            return await storage.UploadAsync(content, "reference.jpg", contentType.ToLowerInvariant(), Folder);
+        }
     }
 }

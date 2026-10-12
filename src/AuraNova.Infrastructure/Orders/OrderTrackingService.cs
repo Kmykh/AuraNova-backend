@@ -24,15 +24,7 @@ namespace AuraNova.Infrastructure.Orders
 
         public async Task<PublicTrackingResponse?> GetTrackingAsync(string orderCode, string trackingToken)
         {
-            var order = await _db.Orders
-                .AsNoTracking()
-                .Include(o => o.Customer)
-                .Include(o => o.StatusHistory)
-                .Include(o => o.Items!)
-                .ThenInclude(i => i.Product)
-                .Include(o => o.DeliveryZone)
-                .Include(o => o.MeetingPoint)
-                .FirstOrDefaultAsync(o => o.OrderCode == orderCode);
+            var order = await OrdersWithDetails().FirstOrDefaultAsync(o => o.OrderCode == orderCode);
 
             if (order == null)
                 return null;
@@ -41,6 +33,31 @@ namespace AuraNova.Infrastructure.Orders
             if (!string.Equals(order.TrackingToken, trackingToken, System.StringComparison.Ordinal))
                 return null;
 
+            return await MapAsync(order);
+        }
+
+        public async Task<PublicTrackingResponse?> GetTrackingByCodeAsync(string trackingCode)
+        {
+            var code = OrderCodes.NormalizeTrackingCode(trackingCode);
+            if (code == null)
+                return null;
+
+            var order = await OrdersWithDetails().FirstOrDefaultAsync(o => o.TrackingToken == code);
+            return order == null ? null : await MapAsync(order);
+        }
+
+        private IQueryable<Order> OrdersWithDetails() => _db.Orders
+            .AsNoTracking()
+            .Include(o => o.Customer)
+            .Include(o => o.StatusHistory)
+            .Include(o => o.Items!)
+            .ThenInclude(i => i.Product)
+            .Include(o => o.DeliveryZone)
+            .Include(o => o.MeetingPoint)
+            .Include(o => o.ReferenceImages);
+
+        private async Task<PublicTrackingResponse> MapAsync(Order order)
+        {
             var history = (order.StatusHistory ?? [])
                 .OrderBy(h => h.CreatedAt)
                 .ToList();
@@ -65,9 +82,9 @@ namespace AuraNova.Infrastructure.Orders
                 };
             }).ToList();
 
-            // Only the owner (order code + token) gets these signed, short-lived URLs
+            // Only the owner (tracking code) gets these signed, short-lived URLs
             var fileUrls = await _storage.GetReadUrlsAsync(
-                new[] { order.ReferenceImageUrl, order.ShippingProofUrl }.OfType<string>());
+                CustomOrderBrief.StoredPaths(order).Append(order.ShippingProofUrl).OfType<string>());
             string? FileUrl(string? stored) => stored == null ? null : fileUrls.GetValueOrDefault(stored);
 
             string? customerFirstName = null;
@@ -88,6 +105,11 @@ namespace AuraNova.Infrastructure.Orders
                 ReferenceImageUrl = FileUrl(order.ReferenceImageUrl),
                 CustomizationNotes = order.CustomizationNotes,
                 Notes = order.Notes,
+                ReferenceImages = CustomOrderBrief.ImageUrls(order, fileUrls),
+                ReferenceLinks = order.ReferenceLinks ?? [],
+                DesiredDate = order.DesiredDate,
+                Occasion = order.Occasion,
+                BudgetRange = order.BudgetRange,
 
                 Costs = new PublicTrackingCosts
                 {

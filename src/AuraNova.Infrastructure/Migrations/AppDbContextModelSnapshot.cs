@@ -517,6 +517,10 @@ namespace AuraNova.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("BudgetRange")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -550,6 +554,9 @@ namespace AuraNova.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<DateOnly?>("DesiredDate")
+                        .HasColumnType("date");
+
                     b.Property<string>("District")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -567,6 +574,10 @@ namespace AuraNova.Infrastructure.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<string>("Occasion")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
                     b.Property<string>("OrderCode")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -581,6 +592,12 @@ namespace AuraNova.Infrastructure.Migrations
 
                     b.Property<string>("ReferenceImageUrl")
                         .HasColumnType("text");
+
+                    b.Property<string>("ReferenceLinks")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValueSql("'[]'");
 
                     b.Property<string>("ShippingProofUrl")
                         .HasColumnType("text");
@@ -712,6 +729,33 @@ namespace AuraNova.Infrastructure.Migrations
 
                             t.HasCheckConstraint("CK_OrderItem_UnitPrice_NonNegative", "\"UnitPrice\" >= 0");
                         });
+                });
+
+            modelBuilder.Entity("AuraNova.Domain.Entities.OrderReferenceImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId", "SortOrder");
+
+                    b.ToTable("OrderReferenceImages", (string)null);
                 });
 
             modelBuilder.Entity("AuraNova.Domain.Entities.OrderStatusHistory", b =>
@@ -1020,6 +1064,17 @@ namespace AuraNova.Infrastructure.Migrations
                     b.Navigation("Product");
                 });
 
+            modelBuilder.Entity("AuraNova.Domain.Entities.OrderReferenceImage", b =>
+                {
+                    b.HasOne("AuraNova.Domain.Entities.Order", "Order")
+                        .WithMany("ReferenceImages")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+                });
+
             modelBuilder.Entity("AuraNova.Domain.Entities.OrderStatusHistory", b =>
                 {
                     b.HasOne("AuraNova.Domain.Entities.Order", "Order")
@@ -1104,6 +1159,8 @@ namespace AuraNova.Infrastructure.Migrations
                     b.Navigation("Payment");
 
                     b.Navigation("Quote");
+
+                    b.Navigation("ReferenceImages");
 
                     b.Navigation("StatusHistory");
                 });

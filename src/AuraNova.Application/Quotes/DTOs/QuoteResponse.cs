@@ -23,5 +23,12 @@ namespace AuraNova.Application.Quotes.DTOs
         public string? ReferenceImageUrl { get; set; }
         public string? CustomizationNotes { get; set; }
         public string DeliveryType { get; set; } = null!;
+
+        // Custom order brief (signed URLs for the images)
+        public List<string> ReferenceImages { get; set; } = new();
+        public List<string> ReferenceLinks { get; set; } = new();
+        public DateOnly? DesiredDate { get; set; }
+        public string? Occasion { get; set; }
+        public string? BudgetRange { get; set; }
     }
 }

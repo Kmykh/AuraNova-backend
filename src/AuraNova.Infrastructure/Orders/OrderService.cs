@@ -348,8 +348,22 @@ namespace AuraNova.Infrastructure.Orders
         /// Generates a unique, human-readable order code in format PED-YYYY-NNNNNN.
         /// Uses the max existing sequence number for the current year to avoid gaps/collisions.
         /// </summary>
-        public async Task<CreateOrderResponse> CreateCustomAsync(CreateCustomOrderRequest request)
+        public async Task<CreateOrderResponse> CreateCustomAsync(CreateCustomOrderRequest request, IReadOnlyList<string>? referenceImagePaths = null)
         {
+            // --- 0. Brief validation (before opening the transaction) ---
+            var referenceLinks = CustomOrderBrief.CleanLinks(request.ReferenceLinks);
+
+            // Peru (UTC-5): the customer can't ask for a date that already passed
+            var todayInPeru = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-5));
+            if (request.DesiredDate.HasValue && request.DesiredDate.Value < todayInPeru)
+                throw new OrderValidationException("La fecha deseada no puede ser anterior a hoy.");
+
+            var imagePaths = referenceImagePaths?.Where(p => !string.IsNullOrWhiteSpace(p)).ToList() ?? new List<string>();
+            if (imagePaths.Count == 0 && !string.IsNullOrWhiteSpace(request.ReferenceImageUrl))
+                imagePaths.Add(request.ReferenceImageUrl);
+            if (imagePaths.Count > 5)
+                throw new OrderValidationException("Puedes enviar hasta 5 imágenes de referencia.");
+
             var supportsTransactions = _db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory";
             Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
 
@@ -438,10 +452,17 @@ namespace AuraNova.Infrastructure.Orders
                     Total = null, // Custom orders always need quoting for total
                     Status = OrderStatus.WaitingQuote,
                     IsCustomOrder = true,
-                    ReferenceImageUrl = request.ReferenceImageUrl,
+                    ReferenceImageUrl = imagePaths.FirstOrDefault(),
                     CustomizationNotes = request.CustomizationNotes,
+                    ReferenceLinks = referenceLinks,
+                    DesiredDate = request.DesiredDate,
+                    Occasion = string.IsNullOrWhiteSpace(request.Occasion) ? null : request.Occasion.Trim(),
+                    BudgetRange = string.IsNullOrWhiteSpace(request.BudgetRange) ? null : request.BudgetRange.Trim(),
                     Items = new List<OrderItem>()
                 };
+                order.ReferenceImages = imagePaths
+                    .Select((path, index) => new OrderReferenceImage { OrderId = order.Id, Path = path, SortOrder = index })
+                    .ToList();
 
                 _db.Orders.Add(order);
 
@@ -505,7 +526,7 @@ namespace AuraNova.Infrastructure.Orders
 
         private async Task<string> GenerateOrderCodeAsync()
         {
-            var prefix = "PED-";
+            var prefix = OrderCodes.OrderNumberPrefix;
 
             if (_db.Database.IsRelational())
             {
@@ -513,28 +534,22 @@ namespace AuraNova.Infrastructure.Orders
                 var next = await _db.Database
                     .SqlQueryRaw<long>("SELECT nextval('\"OrderCodeSequence\"') AS \"Value\"")
                     .SingleAsync();
-                return $"{prefix}{next:D6}";
+                return OrderCodes.FormatOrderNumber(next);
             }
 
-            // Find the highest existing order code for this prefix
-            var lastCode = await _db.Orders
+            // InMemory provider (tests): same numbering, starting at AN-1001.
+            // Compared as numbers: as text "AN-999" would sort after "AN-1000".
+            var codes = await _db.Orders
                 .Where(o => o.OrderCode.StartsWith(prefix))
-                .OrderByDescending(o => o.OrderCode)
                 .Select(o => o.OrderCode)
-                .FirstOrDefaultAsync();
+                .ToListAsync();
 
-            int nextNumber = 1;
-            if (lastCode != null)
-            {
-                // Extract the numeric part after "PED-"
-                var numericPart = lastCode.Substring(prefix.Length);
-                if (int.TryParse(numericPart, out var lastNumber))
-                {
-                    nextNumber = lastNumber + 1;
-                }
-            }
+            var last = codes
+                .Select(code => long.TryParse(code[prefix.Length..], out var number) ? number : 0)
+                .DefaultIfEmpty(0)
+                .Max();
 
-            return $"{prefix}{nextNumber:D6}";
+            return OrderCodes.FormatOrderNumber(Math.Max(last, 1000) + 1);
         }
 
         public async Task<bool> AcceptQuoteAsync(Guid orderId)

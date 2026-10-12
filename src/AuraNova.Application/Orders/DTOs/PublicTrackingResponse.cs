@@ -16,6 +16,13 @@ namespace AuraNova.Application.Orders.DTOs
         public string? CustomizationNotes { get; set; }
         public string? Notes { get; set; }
 
+        // Custom order brief (signed URLs for the images)
+        public List<string> ReferenceImages { get; set; } = new();
+        public List<string> ReferenceLinks { get; set; } = new();
+        public DateOnly? DesiredDate { get; set; }
+        public string? Occasion { get; set; }
+        public string? BudgetRange { get; set; }
+
         public PublicTrackingCosts Costs { get; set; } = new();
         public PublicTrackingEstimates Estimates { get; set; } = new();
         public PublicTrackingNationalShipping? NationalShippingDetails { get; set; }

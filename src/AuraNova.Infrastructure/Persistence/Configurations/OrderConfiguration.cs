@@ -40,6 +40,23 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
             builder.HasMany(o => o.Items).WithOne(i => i.Order).HasForeignKey(i => i.OrderId).OnDelete(DeleteBehavior.Cascade);
 
             builder.HasOne(o => o.Quote).WithOne(q => q.Order).HasForeignKey<Quote>(q => q.OrderId).OnDelete(DeleteBehavior.Cascade);
+
+            // Custom order brief
+            builder.HasMany(o => o.ReferenceImages).WithOne(i => i.Order).HasForeignKey(i => i.OrderId).OnDelete(DeleteBehavior.Cascade);
+            builder.Property(o => o.Occasion).HasMaxLength(60);
+            builder.Property(o => o.BudgetRange).HasMaxLength(60);
+
+            var stringListComparer = new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<string>>(
+                (c1, c2) => (c1 != null ? c1.Count : 0) == (c2 != null ? c2.Count : 0) && (c1 == null || c1.SequenceEqual(c2!)),
+                c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                c => c.ToList());
+
+            builder.Property(o => o.ReferenceLinks)
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<string>())
+                .Metadata.SetValueComparer(stringListComparer);
+            builder.Property(o => o.ReferenceLinks).HasDefaultValueSql("'[]'");
         }
     }
 }
