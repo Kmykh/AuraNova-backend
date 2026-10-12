@@ -14,8 +14,51 @@ namespace AuraNova.Infrastructure.Storage
         IFileStorageService rawStorage,
         IImageOptimizer optimizer,
         IReferenceImageService referenceImages,
+        IStorageUrlResolver urlResolver,
         ILogger<ImageMaintenanceService> logger) : IImageMaintenanceService
     {
+        public async Task<ImageMaintenanceReport> CleanupOrphanProductImagesAsync(bool dryRun, int minAgeHours = 24, CancellationToken cancellationToken = default)
+        {
+            var report = new ImageMaintenanceReport { DryRun = dryRun };
+
+            // Rutas en uso, normalizadas por si algún producto guardó la URL pública completa
+            var inUse = (await db.Products
+                    .Where(p => p.ImageUrl != null && p.ImageUrl != "")
+                    .Select(p => p.ImageUrl!)
+                    .ToListAsync(cancellationToken))
+                .Select(url => urlResolver.ToStoragePath(url)!.TrimStart('/'))
+                .ToHashSet(StringComparer.Ordinal);
+
+            var cutoff = DateTimeOffset.UtcNow.AddHours(-Math.Max(0, minAgeHours));
+            var files = await rawStorage.ListAsync("products");
+
+            foreach (var file in files)
+            {
+                if (inUse.Contains(file.Path))
+                    continue;
+
+                if (file.CreatedAt == null || file.CreatedAt > cutoff)
+                {
+                    report.Skipped++;
+                    continue;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!dryRun)
+                    await rawStorage.DeleteAsync(file.Path);
+
+                report.Processed++;
+                report.BytesBefore += file.Size;
+                report.Items.Add(new ImageMaintenanceItem { Name = "Huérfano", OldPath = file.Path, BytesBefore = file.Size });
+            }
+
+            logger.LogInformation(
+                "Limpieza de huérfanos en products/ (dryRun={DryRun}): {Count} archivos, {Bytes} bytes; {Skipped} recientes omitidos",
+                dryRun, report.Processed, report.BytesBefore, report.Skipped);
+
+            return report;
+        }
+
         public async Task<ImageMaintenanceReport> OptimizeProductImagesAsync(bool dryRun, bool deleteOriginals, CancellationToken cancellationToken = default)
         {
             var report = new ImageMaintenanceReport { DryRun = dryRun };

@@ -25,12 +25,9 @@ namespace AuraNova.API.Extensions
                 return;
             }
 
+            // ForwardedHeaders (Program.cs) already resolved the real client IP behind Render's proxy;
+            // the first X-Forwarded-For entry can be forged by the client.
             var ipAddress = controller.HttpContext.Connection.RemoteIpAddress?.ToString();
-            // Handle forwarded headers from proxy/Render if available
-            if (controller.HttpContext.Request.Headers.TryGetValue("X-Forwarded-For", out var forwardedFor))
-            {
-                ipAddress = forwardedFor.ToString().Split(',')[0].Trim();
-            }
 
             var userAgent = controller.HttpContext.Request.Headers["User-Agent"].ToString();
 
