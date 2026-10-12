@@ -95,6 +95,7 @@ namespace AuraNova.Infrastructure.Orders
 
             return new PublicTrackingResponse
             {
+                OrderId = order.Id,
                 OrderCode = order.OrderCode,
                 CustomerFirstName = customerFirstName,
                 Status = order.Status.ToString(),

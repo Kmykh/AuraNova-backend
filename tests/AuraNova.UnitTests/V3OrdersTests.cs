@@ -102,6 +102,7 @@ namespace AuraNova.UnitTests
 
             Assert.NotNull(result);
             Assert.Equal(created.OrderCode, result!.OrderCode);
+            Assert.Equal(created.Id, result.OrderId);
             var json = System.Text.Json.JsonSerializer.Serialize(result);
             Assert.DoesNotContain(created.TrackingToken, json);
             Assert.DoesNotContain("987654321", json);

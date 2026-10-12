@@ -5,6 +5,11 @@ namespace AuraNova.Application.Orders.DTOs
 {
     public class PublicTrackingResponse
     {
+        /// <summary>
+        /// Id interno: lo necesita el cliente para subir el comprobante o aceptar la cotización desde el seguimiento.
+        /// Solo lo recibe quien tiene el código de seguimiento.
+        /// </summary>
+        public Guid OrderId { get; set; }
         public string OrderCode { get; set; } = null!;
         public string? CustomerFirstName { get; set; }
         public string Status { get; set; } = null!;
