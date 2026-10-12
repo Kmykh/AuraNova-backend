@@ -21,6 +21,8 @@ namespace AuraNova.IntegrationTests
             public Task<Stream?> DownloadAsync(string path) => Task.FromResult<Stream?>(null);
             public Task<IReadOnlyDictionary<string, string>> GetReadUrlsAsync(IEnumerable<string> storedPaths) =>
                 Task.FromResult<IReadOnlyDictionary<string, string>>(storedPaths.Distinct().ToDictionary(p => p, p => $"https://files.test/{p}"));
+            public Task<IReadOnlyList<StoredFileInfo>> ListAsync(string folder) =>
+                Task.FromResult<IReadOnlyList<StoredFileInfo>>([]);
         }
 
         private WebApplicationFactory<Program> CreateFactory(string dbName)

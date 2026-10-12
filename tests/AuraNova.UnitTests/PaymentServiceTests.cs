@@ -50,6 +50,11 @@ namespace AuraNova.UnitTests
             {
                 return Task.FromResult<IReadOnlyDictionary<string, string>>(storedPaths.Distinct().ToDictionary(p => p, p => $"https://files.test/{p}"));
             }
+
+            public Task<IReadOnlyList<StoredFileInfo>> ListAsync(string folder)
+            {
+                return Task.FromResult<IReadOnlyList<StoredFileInfo>>([]);
+            }
         }
 
         private PaymentService CreateService(AppDbContext db)

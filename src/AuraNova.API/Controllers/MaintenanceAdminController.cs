@@ -36,6 +36,22 @@ namespace AuraNova.API.Controllers
         }
 
         /// <summary>
+        /// Borra de products/ las imágenes que ningún producto usa (las reemplazadas y los originales ya convertidos).
+        /// Omite archivos subidos en las últimas minAgeHours horas.
+        /// </summary>
+        [HttpPost("cleanup-orphan-products")]
+        public async Task<IActionResult> CleanupOrphanProducts([FromQuery] bool dryRun = true, [FromQuery] int minAgeHours = 24, CancellationToken cancellationToken = default)
+        {
+            var report = await maintenanceService.CleanupOrphanProductImagesAsync(dryRun, minAgeHours, cancellationToken);
+
+            if (!dryRun)
+                await this.LogActionAsync(auditService, "CleanupOrphanProductImages", "Product", null,
+                    $"Imágenes huérfanas eliminadas: {report.Processed} ({report.BytesBefore} bytes).");
+
+            return Ok(report);
+        }
+
+        /// <summary>
         /// Mueve al bucket privado (customer-files) los comprobantes, constancias de envío e imágenes de referencia
         /// que quedaron en el bucket público, y borra la copia pública.
         /// </summary>

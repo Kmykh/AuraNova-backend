@@ -190,6 +190,41 @@ namespace AuraNova.Infrastructure.Storage
             return result;
         }
 
+        public async Task<IReadOnlyList<StoredFileInfo>> ListAsync(string folder)
+        {
+            folder = folder.Trim('/');
+            var isPrivate = IsPrivateFolder(folder);
+            var bucket = isPrivate ? _privateBucketName : _bucketName;
+            var files = new List<StoredFileInfo>();
+
+            const int pageSize = 1000;
+            for (var offset = 0; ; offset += pageSize)
+            {
+                var response = await _httpClient.PostAsJsonAsync($"object/list/{bucket}", new
+                {
+                    prefix = folder,
+                    limit = pageSize,
+                    offset,
+                    sortBy = new { column = "name", order = "asc" }
+                });
+                response.EnsureSuccessStatusCode();
+
+                var page = await response.Content.ReadFromJsonAsync<List<ListedObject>>() ?? [];
+                // Las subcarpetas vienen sin id
+                foreach (var item in page.Where(i => i.Id != null && i.Name != null))
+                {
+                    var path = $"{folder}/{item.Name}";
+                    files.Add(new StoredFileInfo(isPrivate ? PrivatePrefix + path : path,
+                        item.Metadata?.Size ?? 0, item.Created_At));
+                }
+
+                if (page.Count < pageSize)
+                    break;
+            }
+
+            return files;
+        }
+
         private bool IsPrivateFolder(string folder) =>
             _privateFolders.Contains(folder.Trim('/').Split('/')[0]);
 
@@ -205,6 +240,19 @@ namespace AuraNova.Infrastructure.Storage
             var marker = $"/object/public/{_bucketName}/";
             var index = stored.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
             return (_bucketName, index >= 0 ? stored[(index + marker.Length)..] : stored.TrimStart('/'));
+        }
+
+        private sealed class ListedObject
+        {
+            public string? Name { get; set; }
+            public string? Id { get; set; }
+            public DateTimeOffset? Created_At { get; set; }
+            public ListedObjectMetadata? Metadata { get; set; }
+        }
+
+        private sealed class ListedObjectMetadata
+        {
+            public long Size { get; set; }
         }
 
         private sealed class SignedUrlResult

@@ -50,6 +50,8 @@ namespace AuraNova.UnitTests
             public Task<Stream?> DownloadAsync(string path) => Task.FromResult<Stream?>(null);
             public Task<IReadOnlyDictionary<string, string>> GetReadUrlsAsync(IEnumerable<string> storedPaths) =>
                 Task.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string>());
+            public Task<IReadOnlyList<StoredFileInfo>> ListAsync(string folder) =>
+                Task.FromResult<IReadOnlyList<StoredFileInfo>>([]);
         }
 
         [Fact]

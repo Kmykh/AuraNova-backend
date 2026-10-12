@@ -16,7 +16,15 @@ namespace AuraNova.Application.Storage.Interfaces
         /// Las rutas que no se pudieron resolver no aparecen en el resultado.
         /// </summary>
         Task<IReadOnlyDictionary<string, string>> GetReadUrlsAsync(IEnumerable<string> storedPaths);
+
+        /// <summary>
+        /// Lista los archivos de una carpeta (no recursivo). Las rutas devueltas tienen el mismo formato
+        /// que guarda la BD (con prefijo "private/" si la carpeta es privada).
+        /// </summary>
+        Task<IReadOnlyList<StoredFileInfo>> ListAsync(string folder);
     }
+
+    public sealed record StoredFileInfo(string Path, long Size, DateTimeOffset? CreatedAt);
 
     public static class FileStorageServiceExtensions
     {

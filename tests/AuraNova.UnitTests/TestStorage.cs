@@ -11,10 +11,20 @@ namespace AuraNova.UnitTests
     {
         public const string SignedBase = "https://signed.test/";
 
+        public List<StoredFileInfo> Files { get; } = [];
+        public List<string> Deleted { get; } = [];
+
         public Task<string> UploadAsync(Stream fileStream, string fileName, string contentType, string folder) =>
             Task.FromResult($"{folder}/{fileName}");
 
-        public Task DeleteAsync(string path) => Task.CompletedTask;
+        public Task DeleteAsync(string path)
+        {
+            Deleted.Add(path);
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<StoredFileInfo>> ListAsync(string folder) =>
+            Task.FromResult<IReadOnlyList<StoredFileInfo>>(Files.Where(f => f.Path.StartsWith(folder + "/")).ToList());
 
         public Task<Stream?> DownloadAsync(string path) => Task.FromResult<Stream?>(null);
 

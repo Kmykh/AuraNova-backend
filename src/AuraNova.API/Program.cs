@@ -152,6 +152,7 @@ builder.Services.AddScoped<AuraNova.Application.Storage.Interfaces.IImageMainten
         sp.GetRequiredService<AuraNova.Infrastructure.Storage.SupabaseStorageService>(), // sin decorador: evita doble compresión
         sp.GetRequiredService<AuraNova.Application.Storage.Interfaces.IImageOptimizer>(),
         sp.GetRequiredService<AuraNova.Application.Storage.Interfaces.IReferenceImageService>(),
+        sp.GetRequiredService<AuraNova.Application.Storage.Interfaces.IStorageUrlResolver>(),
         sp.GetRequiredService<ILogger<AuraNova.Infrastructure.Storage.ImageMaintenanceService>>()));
 
 // register payment services
@@ -322,8 +323,9 @@ app.MapHub<AuraNova.API.Hubs.SuperAdminLiveHub>("/hubs/live");
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    // Integration tests use the InMemory provider, which has no migrations
-    if (db.Database.IsRelational())
+    // Integration tests use the InMemory provider, which has no migrations.
+    // Database__ApplyMigrationsOnStartup=false lets a local instance point at production without changing its schema.
+    if (db.Database.IsRelational() && builder.Configuration.GetValue("Database:ApplyMigrationsOnStartup", true))
         db.Database.Migrate();
 }
 
