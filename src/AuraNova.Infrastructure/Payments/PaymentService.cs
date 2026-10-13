@@ -26,7 +26,7 @@ namespace AuraNova.Infrastructure.Payments
         private readonly AuraNova.Application.Auth.Interfaces.ICurrentUserService _currentUserService;
         private readonly ILogger<PaymentService> _logger;
 
-        private const int MaxFileSizeMB = 5;
+        private const int MaxFileSizeMB = 10;
         private const long MaxFileSizeBytes = MaxFileSizeMB * 1024 * 1024;
         private readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
         private readonly string[] AllowedMimeTypes = { "image/jpeg", "image/png", "image/webp" };

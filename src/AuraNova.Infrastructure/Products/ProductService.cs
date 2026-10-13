@@ -37,22 +37,28 @@ namespace AuraNova.Infrastructure.Products
                 }
             }
 
+            var images = NormalizeImages(request.ImageUrls, request.ImageUrl, existing: null);
+
             var product = new Product
             {
                 Name = request.Name.Trim(),
                 Description = request.Description?.Trim(),
                 Price = request.Price,
-                ImageUrl = request.ImageUrl?.Trim(),
+                ImageUrl = images.FirstOrDefault(),
                 Stock = request.Stock,
                 IsAvailable = true,
-                AvailableColors = request.AvailableColors ?? new List<string>(),
-                AvailableFlowerTypes = request.AvailableFlowerTypes ?? new List<string>(),
+                AvailableColors = CleanOptions(request.AvailableColors, "color"),
+                AvailableFlowerTypes = CleanOptions(request.AvailableFlowerTypes, "tipo de flor"),
                 AllowsLights = request.AllowsLights,
                 AllowsButterfly = request.AllowsButterfly,
                 AllowsPhraseCard = request.AllowsPhraseCard,
                 CategoryId = request.CategoryId,
                 Audience = request.Audience
             };
+
+            product.Images = images
+                .Select((path, index) => new ProductImage { ProductId = product.Id, Path = path, SortOrder = index })
+                .ToList();
 
             _db.Products.Add(product);
             await _db.SaveChangesAsync();
@@ -67,6 +73,7 @@ namespace AuraNova.Infrastructure.Products
             var products = await _db.Products
                 .AsNoTracking()
                 .Include(p => p.Category)
+                .Include(p => p.Images)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
 
@@ -75,13 +82,15 @@ namespace AuraNova.Infrastructure.Products
 
         public async Task<ProductResponse?> GetAdminByIdAsync(Guid id)
         {
-            var product = await _db.Products.Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id);
+            var product = await _db.Products.AsNoTracking().Include(p => p.Category).Include(p => p.Images)
+                .FirstOrDefaultAsync(p => p.Id == id);
             return product == null ? null : MapToResponse(product);
         }
 
         public async Task<ProductResponse?> UpdateAsync(Guid id, UpdateProductRequest request)
         {
-            var product = await _db.Products.Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id);
+            var product = await _db.Products.Include(p => p.Category).Include(p => p.Images)
+                .FirstOrDefaultAsync(p => p.Id == id);
             if (product == null)
                 return null;
 
@@ -94,14 +103,15 @@ namespace AuraNova.Infrastructure.Products
                 }
             }
 
-            var previousImageUrl = product.ImageUrl;
+            var previousImages = GalleryPaths(product);
+            var images = NormalizeImages(request.ImageUrls, request.ImageUrl, previousImages);
 
             product.Name = request.Name.Trim();
             product.Description = request.Description?.Trim();
             product.Price = request.Price;
-            product.ImageUrl = request.ImageUrl?.Trim();
-            product.AvailableColors = request.AvailableColors ?? new List<string>();
-            product.AvailableFlowerTypes = request.AvailableFlowerTypes ?? new List<string>();
+            product.ImageUrl = images.FirstOrDefault();
+            product.AvailableColors = CleanOptions(request.AvailableColors, "color");
+            product.AvailableFlowerTypes = CleanOptions(request.AvailableFlowerTypes, "tipo de flor");
             product.AllowsLights = request.AllowsLights;
             product.AllowsButterfly = request.AllowsButterfly;
             product.AllowsPhraseCard = request.AllowsPhraseCard;
@@ -109,13 +119,20 @@ namespace AuraNova.Infrastructure.Products
             product.Audience = request.Audience;
             product.UpdatedAt = DateTimeOffset.UtcNow;
 
-            _db.Products.Update(product);
+            // La galería se reescribe completa en el orden recibido
+            _db.ProductImages.RemoveRange(product.Images ?? []);
+            var gallery = images
+                .Select((path, index) => new ProductImage { ProductId = product.Id, Path = path, SortOrder = index })
+                .ToList();
+            _db.ProductImages.AddRange(gallery);
+            product.Images = gallery;
+
             await _db.SaveChangesAsync();
 
             _logger.LogInformation("Producto actualizado: {ProductId}", id);
 
-            if (!string.IsNullOrWhiteSpace(previousImageUrl) && previousImageUrl != product.ImageUrl)
-                await DeleteImageIfUnusedAsync(previousImageUrl);
+            foreach (var removed in previousImages.Except(images))
+                await DeleteImageIfUnusedAsync(removed);
 
             return MapToResponse(product, null);
         }
@@ -160,6 +177,7 @@ namespace AuraNova.Infrastructure.Products
             var products = await _db.Products
                 .AsNoTracking()
                 .Include(p => p.Category)
+                .Include(p => p.Images)
                 .Where(p => p.IsAvailable)
                 .OrderByDescending(p => p.CreatedAt)
                 .ToListAsync();
@@ -174,12 +192,37 @@ namespace AuraNova.Infrastructure.Products
 
         public async Task<ProductResponse?> GetPublicByIdAsync(Guid id)
         {
-            var product = await _db.Products.AsNoTracking().Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id);
+            var product = await _db.Products.AsNoTracking().Include(p => p.Category).Include(p => p.Images)
+                .FirstOrDefaultAsync(p => p.Id == id);
             if (product == null || !product.IsAvailable)
                 return null;
 
             var priceResult = await _priceResolver.ResolvePriceAsync(product.Id);
-            return MapToResponse(product, priceResult);
+            var response = MapToResponse(product, priceResult);
+
+            if (priceResult.IsCampaignPrice && priceResult.CampaignId.HasValue)
+            {
+                // Todas las etapas de la campaña con el precio de este producto: el detalle muestra cuándo sube
+                var campaignId = priceResult.CampaignId.Value;
+                response.CampaignStages = await _db.CampaignProductStagePrices
+                    .AsNoTracking()
+                    .Where(sp => sp.CampaignProduct!.ProductId == product.Id &&
+                                 sp.CampaignProduct.CampaignId == campaignId &&
+                                 sp.CampaignProduct.IsActive &&
+                                 sp.CampaignStage!.IsActive)
+                    .OrderBy(sp => sp.CampaignStage!.StartDate)
+                    .Select(sp => new ProductCampaignStageResponse
+                    {
+                        Name = sp.CampaignStage!.Name,
+                        StartDate = sp.CampaignStage.StartDate,
+                        EndDate = sp.CampaignStage.EndDate,
+                        Price = sp.Price,
+                        IsCurrent = sp.CampaignStageId == priceResult.CampaignStageId
+                    })
+                    .ToListAsync();
+            }
+
+            return response;
         }
 
         /// <summary>
@@ -191,12 +234,73 @@ namespace AuraNova.Infrastructure.Products
             if (!imagePath.StartsWith("products/", StringComparison.OrdinalIgnoreCase))
                 return;
 
-            var stillUsed = await _db.Products.AnyAsync(p => p.ImageUrl == imagePath);
+            var stillUsed = await _db.Products.AnyAsync(p => p.ImageUrl == imagePath) ||
+                            await _db.ProductImages.AnyAsync(i => i.Path == imagePath);
             if (stillUsed)
                 return;
 
             await _storage.DeleteAsync(imagePath);
             _logger.LogInformation("Imagen anterior eliminada del storage: {Path}", imagePath);
+        }
+
+        private const int MaxGalleryImages = 8;
+
+        /// <summary>
+        /// Galería final en orden. Con <paramref name="imageUrls"/> se usa tal cual; sin ella (clientes anteriores)
+        /// la imagen única reemplaza la portada y se conservan las demás fotos.
+        /// </summary>
+        private static List<string> NormalizeImages(List<string>? imageUrls, string? imageUrl, IReadOnlyList<string>? existing)
+        {
+            List<string> images;
+            if (imageUrls != null)
+            {
+                images = imageUrls.Select(u => u?.Trim() ?? string.Empty).Where(u => u.Length > 0).Distinct().ToList();
+            }
+            else
+            {
+                images = new List<string>();
+                if (!string.IsNullOrWhiteSpace(imageUrl))
+                    images.Add(imageUrl.Trim());
+                images.AddRange((existing ?? []).Skip(1).Where(u => !images.Contains(u)));
+            }
+
+            if (images.Count > MaxGalleryImages)
+                throw new ArgumentException($"Un producto puede tener hasta {MaxGalleryImages} fotos.");
+
+            foreach (var path in images)
+            {
+                var isUrl = Uri.TryCreate(path, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp);
+                if (path.Length > 1000 || (!isUrl && (path.StartsWith('/') || path.Contains("..") || path.Contains(':'))))
+                    throw new ArgumentException("Una de las fotos del producto no tiene una ruta válida.");
+            }
+
+            return images;
+        }
+
+        /// <summary>Cada opción es un elemento: sin comas, sin repetidos y sin espacios sobrantes.</summary>
+        private static List<string> CleanOptions(List<string>? options, string label)
+        {
+            var result = new List<string>();
+            foreach (var option in options ?? [])
+            {
+                var value = option?.Trim() ?? string.Empty;
+                if (value.Length == 0 || result.Contains(value, StringComparer.OrdinalIgnoreCase))
+                    continue;
+                if (value.Contains(','))
+                    throw new ArgumentException($"El {label} '{value}' tiene comas: agrega cada opción por separado.");
+                if (value.Length > 50)
+                    throw new ArgumentException($"El {label} '{value}' supera los 50 caracteres.");
+                result.Add(value);
+            }
+            return result;
+        }
+
+        private static List<string> GalleryPaths(Product product)
+        {
+            var gallery = (product.Images ?? []).OrderBy(i => i.SortOrder).Select(i => i.Path).ToList();
+            if (gallery.Count == 0 && !string.IsNullOrWhiteSpace(product.ImageUrl))
+                gallery.Add(product.ImageUrl);
+            return gallery;
         }
 
         private static ProductResponse MapToResponse(Product product,
@@ -209,6 +313,7 @@ namespace AuraNova.Infrastructure.Products
                 Description = product.Description,
                 Price = product.Price,
                 ImageUrl = product.ImageUrl,
+                Images = GalleryPaths(product),
                 Stock = product.Stock,
                 IsAvailable = product.IsAvailable,
                 CreatedAt = product.CreatedAt,
@@ -236,7 +341,8 @@ namespace AuraNova.Infrastructure.Products
                 IsCampaignActive = priceResult?.IsCampaignPrice ?? false,
                 CampaignId = priceResult?.CampaignId,
                 CampaignName = priceResult?.CampaignName,
-                CampaignStageName = priceResult?.CampaignStageName
+                CampaignStageName = priceResult?.CampaignStageName,
+                CampaignStageEndsAt = priceResult?.CampaignStageEndDate
             };
         }
     }

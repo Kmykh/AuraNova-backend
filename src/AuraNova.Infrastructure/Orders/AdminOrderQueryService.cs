@@ -6,6 +6,7 @@ using AuraNova.Application.AdminOrders.Interfaces;
 using AuraNova.Application.Common.Models;
 using AuraNova.Application.Storage.Interfaces;
 using AuraNova.Domain.Entities;
+using AuraNova.Domain.Enums;
 using AuraNova.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,6 +31,10 @@ namespace AuraNova.Infrastructure.Orders
             {
                 query = query.Where(o => o.Status == request.Status.Value);
             }
+            else if (ViewStatuses(request.View) is { } statuses)
+            {
+                query = query.Where(o => statuses.Contains(o.Status));
+            }
 
             if (request.DeliveryType.HasValue)
             {
@@ -49,11 +54,14 @@ namespace AuraNova.Infrastructure.Orders
 
             if (!string.IsNullOrWhiteSpace(request.Search))
             {
-                var search = request.Search.ToLower();
-                query = query.Where(o => 
+                var search = request.Search.Trim().ToLower();
+                var trackingCode = OrderCodes.NormalizeTrackingCode(request.Search);
+                query = query.Where(o =>
                     o.OrderCode.ToLower().Contains(search) ||
+                    (trackingCode != null && o.TrackingToken == trackingCode) ||
                     (o.Customer != null && o.Customer.Name.ToLower().Contains(search)) ||
-                    (o.Customer != null && o.Customer.Phone.Contains(search))
+                    (o.Customer != null && o.Customer.Phone.Contains(search)) ||
+                    o.Items!.Any(i => i.Product != null && i.Product.Name.ToLower().Contains(search))
                 );
             }
 
@@ -81,7 +89,24 @@ namespace AuraNova.Infrastructure.Orders
                     o.CreatedAt,
                     o.UpdatedAt,
                     o.StartedAt,
-                    o.EstimatedReadyAt
+                    o.EstimatedReadyAt,
+                    o.DesiredDate,
+                    o.Occasion,
+                    ZoneName = o.DeliveryZone != null ? o.DeliveryZone.Name : null,
+                    MeetingPointName = o.MeetingPoint != null ? o.MeetingPoint.Name : null,
+                    o.District,
+                    PaymentStatus = o.Payment != null ? (PaymentStatus?)o.Payment.Status : null,
+                    ReferenceImageCount = o.ReferenceImages!.Count(),
+                    Items = o.Items!
+                        .Select(i => new
+                        {
+                            i.Quantity,
+                            ProductName = i.Product != null ? i.Product.Name : string.Empty,
+                            ImageUrl = i.Product != null ? i.Product.ImageUrl : null,
+                            i.SelectedColors,
+                            HasExtras = i.HasLights || i.HasButterfly || i.HasPhraseCard
+                        })
+                        .ToList()
                 })
                 .ToListAsync();
 
@@ -102,11 +127,56 @@ namespace AuraNova.Infrastructure.Orders
                     CreatedAt = o.CreatedAt,
                     UpdatedAt = o.UpdatedAt,
                     StartedAt = o.StartedAt,
-                    EstimatedReadyAt = o.EstimatedReadyAt
+                    EstimatedReadyAt = o.EstimatedReadyAt,
+                    DesiredDate = o.DesiredDate,
+                    Occasion = o.Occasion,
+                    DeliveryPlace = o.DeliveryType switch
+                    {
+                        DeliveryType.MeetingPoint => o.MeetingPointName,
+                        DeliveryType.Delivery => o.ZoneName,
+                        _ => o.District
+                    },
+                    PaymentStatus = o.PaymentStatus?.ToString(),
+                    ReferenceImageCount = o.ReferenceImageCount,
+                    ItemCount = o.Items.Sum(i => i.Quantity),
+                    Items = o.Items.Select(i => new AdminOrderListProduct
+                    {
+                        ProductName = i.ProductName,
+                        Quantity = i.Quantity,
+                        ImageUrl = i.ImageUrl,
+                        Colors = (i.SelectedColors ?? []).Take(4).ToList(),
+                        HasExtras = i.HasExtras
+                    }).ToList()
                 }).ToList();
 
             return new PagedResponse<AdminOrderListItemResponse>(items, totalItems, request.Page, request.PageSize);
         }
+
+        public async Task<AdminOrderCountsResponse> GetCountsAsync()
+        {
+            var counts = await _db.Set<Order>()
+                .AsNoTracking()
+                .GroupBy(o => o.Status)
+                .Select(g => new { Status = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            return new AdminOrderCountsResponse
+            {
+                ByStatus = counts.ToDictionary(c => c.Status.ToString(), c => c.Count),
+                Total = counts.Sum(c => c.Count)
+            };
+        }
+
+        /// <summary>Estados que agrupa cada pestaña del panel.</summary>
+        private static OrderStatus[]? ViewStatuses(string? view) => view?.Trim().ToLowerInvariant() switch
+        {
+            "action" => [OrderStatus.WaitingQuote, OrderStatus.PaymentReported, OrderStatus.PaymentConfirmed],
+            "customer" => [OrderStatus.QuoteReady, OrderStatus.WaitingPayment],
+            "workshop" => [OrderStatus.Preparing],
+            "delivery" => [OrderStatus.Ready, OrderStatus.Shipped, OrderStatus.DeliveredToAgency],
+            "done" => [OrderStatus.Delivered, OrderStatus.Cancelled],
+            _ => null
+        };
 
         public async Task<AdminOrderDetailResponse?> GetOrderDetailAsync(Guid id)
         {
@@ -179,9 +249,12 @@ namespace AuraNova.Infrastructure.Orders
                 {
                     ProductId = i.ProductId,
                     ProductName = i.Product?.Name ?? string.Empty,
+                    ImageUrl = i.Product?.ImageUrl,
                     Quantity = i.Quantity,
                     UnitPrice = i.UnitPrice,
                     Subtotal = i.Subtotal,
+                    SelectedColors = i.SelectedColors ?? [],
+                    SelectedFlowerTypes = i.SelectedFlowerTypes ?? [],
                     SelectedPrimaryColor = i.SelectedPrimaryColor,
                     SelectedSecondaryColor = i.SelectedSecondaryColor,
                     SelectedFlowerType = i.SelectedFlowerType,
@@ -190,7 +263,9 @@ namespace AuraNova.Infrastructure.Orders
                     HasButterfly = i.HasButterfly,
                     HasPhraseCard = i.HasPhraseCard,
                     PhraseText = i.PhraseText,
-                    PhraseFont = i.PhraseFont
+                    PhraseFont = i.PhraseFont,
+                    AppliedCampaignName = i.AppliedCampaignName,
+                    AppliedCampaignStageName = i.AppliedCampaignStageName
                 }).ToList() ?? new List<AdminOrderItem>(),
                 StatusHistory = order.StatusHistory?.OrderByDescending(h => h.CreatedAt).Select(h => new AdminOrderStatusHistory
                 {

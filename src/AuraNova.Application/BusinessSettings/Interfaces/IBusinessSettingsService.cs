@@ -11,5 +11,7 @@ namespace AuraNova.Application.BusinessSettings.Interfaces
         Task<BusinessSettingsResponse> UpdateAsync(UpdateBusinessSettingsRequest request);
         Task<BusinessSettingsResponse> UploadYapeQrAsync(Stream fileStream, string fileName, string contentType);
         Task RemoveYapeQrAsync();
+        Task<CustomizationOptionsDto> GetCustomizationOptionsAsync();
+        Task<CustomizationOptionsDto> UpdateCustomizationOptionsAsync(CustomizationOptionsDto request);
     }
 }

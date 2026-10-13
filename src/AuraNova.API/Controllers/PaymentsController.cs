@@ -40,14 +40,16 @@ namespace AuraNova.API.Controllers
 
         [HttpPost("orders/{orderId:guid}/payment-evidence")]
         [Consumes("multipart/form-data")]
+        [RequestSizeLimit(11 * 1024 * 1024)]
         [EnableRateLimiting("evidence_upload_policy")]
         public async Task<IActionResult> ReportEvidence(Guid orderId, IFormFile evidence)
         {
             if (evidence == null || evidence.Length == 0)
                 return BadRequest(new { message = "Se requiere un archivo de evidencia válido." });
 
-            if (evidence.Length > 5 * 1024 * 1024) // 5 MB max
-                return BadRequest(new { message = "El archivo no debe exceder los 5 MB." });
+            // Se acepta hasta 10 MB: la foto se re-comprime a WebP (≈200-400 KB) antes de guardarse
+            if (evidence.Length > 10 * 1024 * 1024)
+                return BadRequest(new { message = "La foto del comprobante no debe pesar más de 10 MB." });
 
             var ext = Path.GetExtension(evidence.FileName).ToLowerInvariant();
             string[] allowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };

@@ -142,6 +142,98 @@ namespace AuraNova.Infrastructure.BusinessSettings
             }
         }
 
+        // Paleta inicial: la que usaba el panel antes de que fuera editable
+        private static readonly ColorOptionDto[] DefaultColors =
+        [
+            new() { Name = "Rojo", Hex = "#ef4444" },
+            new() { Name = "Rosado", Hex = "#f472b6" },
+            new() { Name = "Rosa Pastel", Hex = "#fbcfe8" },
+            new() { Name = "Blanco", Hex = "#ffffff" },
+            new() { Name = "Amarillo", Hex = "#facc15" },
+            new() { Name = "Azul", Hex = "#3b82f6" },
+            new() { Name = "Celeste", Hex = "#93c5fd" },
+            new() { Name = "Morado", Hex = "#8b5cf6" },
+            new() { Name = "Lila", Hex = "#c4b5fd" },
+            new() { Name = "Fucsia", Hex = "#d946ef" },
+            new() { Name = "Naranja", Hex = "#fb923c" },
+            new() { Name = "Champagne", Hex = "#fef3c7" },
+            new() { Name = "Vino Tinto", Hex = "#881337" },
+            new() { Name = "Multicolor", Hex = MulticolorHex },
+        ];
+
+        private static readonly string[] DefaultFlowerTypes =
+        [
+            "Rosas", "Girasoles", "Tulipanes", "Lirios", "Orquídeas", "Margaritas", "Claveles", "Hortensias",
+            "Peonías", "Crisantemos", "Gerberas", "Gypsophila (Lluvia)", "Astromelias", "Lavanda", "Flores Silvestres"
+        ];
+
+        private const string MulticolorHex = "multicolor";
+        private const int MaxColors = 40;
+        private const int MaxFlowerTypes = 40;
+        private const int MaxOptionLength = 40;
+
+        public async Task<CustomizationOptionsDto> GetCustomizationOptionsAsync()
+        {
+            var settings = await GetOrCreateSettingsAsync();
+            return MapOptions(settings);
+        }
+
+        public async Task<CustomizationOptionsDto> UpdateCustomizationOptionsAsync(CustomizationOptionsDto request)
+        {
+            var colors = new List<ColorOption>();
+            foreach (var color in request.Colors ?? [])
+            {
+                var name = color.Name?.Trim() ?? string.Empty;
+                var hex = color.Hex?.Trim().ToLowerInvariant() ?? string.Empty;
+                if (name.Length == 0)
+                    continue;
+                if (name.Length > MaxOptionLength)
+                    throw new ArgumentException($"El color '{name}' supera los {MaxOptionLength} caracteres.");
+                if (name.Contains(','))
+                    throw new ArgumentException($"El color '{name}' no puede tener comas: agrégalo como opciones separadas.");
+                if (hex != MulticolorHex && !System.Text.RegularExpressions.Regex.IsMatch(hex, "^#[0-9a-f]{6}$"))
+                    throw new ArgumentException($"El código del color '{name}' no es válido (usa #rrggbb).");
+                if (colors.Any(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                colors.Add(new ColorOption { Name = name, Hex = hex });
+            }
+
+            var flowers = new List<string>();
+            foreach (var flower in request.FlowerTypes ?? [])
+            {
+                var name = flower?.Trim() ?? string.Empty;
+                if (name.Length == 0)
+                    continue;
+                if (name.Length > MaxOptionLength)
+                    throw new ArgumentException($"La flor '{name}' supera los {MaxOptionLength} caracteres.");
+                if (name.Contains(','))
+                    throw new ArgumentException($"La flor '{name}' no puede tener comas: agrégala como opciones separadas.");
+                if (!flowers.Contains(name, StringComparer.OrdinalIgnoreCase))
+                    flowers.Add(name);
+            }
+
+            if (colors.Count > MaxColors || flowers.Count > MaxFlowerTypes)
+                throw new ArgumentException($"Puedes tener hasta {MaxColors} colores y {MaxFlowerTypes} tipos de flor.");
+
+            var settings = await GetOrCreateSettingsAsync();
+            settings.ColorPalette = colors;
+            settings.FlowerTypeOptions = flowers;
+            settings.UpdatedAt = DateTimeOffset.UtcNow;
+            await _db.SaveChangesAsync();
+
+            return MapOptions(settings);
+        }
+
+        private static CustomizationOptionsDto MapOptions(AuraNova.Domain.Entities.BusinessSettings settings) => new()
+        {
+            Colors = settings.ColorPalette is { Count: > 0 }
+                ? settings.ColorPalette.Select(c => new ColorOptionDto { Name = c.Name, Hex = c.Hex }).ToList()
+                : DefaultColors.Select(c => new ColorOptionDto { Name = c.Name, Hex = c.Hex }).ToList(),
+            FlowerTypes = settings.FlowerTypeOptions is { Count: > 0 }
+                ? settings.FlowerTypeOptions.ToList()
+                : DefaultFlowerTypes.ToList()
+        };
+
         private BusinessSettingsResponse MapToResponse(AuraNova.Domain.Entities.BusinessSettings settings)
         {
             return new BusinessSettingsResponse

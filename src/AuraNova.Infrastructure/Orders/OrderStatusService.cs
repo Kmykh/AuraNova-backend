@@ -41,6 +41,7 @@ namespace AuraNova.Infrastructure.Orders
         {
             var order = await _db.Orders
                 .Include(o => o.Items)
+                .Include(o => o.Payment)
                 .FirstOrDefaultAsync(o => o.Id == orderId);
             if (order == null)
                 throw new OrderNotFoundException($"Pedido con Id '{orderId}' no encontrado.");
@@ -50,6 +51,15 @@ namespace AuraNova.Infrastructure.Orders
             if (!_transitions.IsTransitionAllowed(oldStatus, newStatus, order.DeliveryType))
                 throw new OrderValidationException(
                     $"Transición inválida: {oldStatus} → {newStatus} para tipo de entrega {order.DeliveryType}.");
+
+            // Sin precio no hay cotización: se usa "Enviar cotización", que guarda el total
+            if (newStatus == OrderStatus.QuoteReady && order.Total is not > 0)
+                throw new OrderValidationException(
+                    "Para marcar la cotización como lista primero ingresa el precio en \"Enviar cotización\".");
+
+            // Pasar a "esperando pago" requiere un total y un pago pendiente por ese monto
+            if (newStatus == OrderStatus.WaitingPayment && order.Total is not > 0)
+                throw new OrderValidationException("El pedido todavía no tiene un precio. Envía la cotización primero.");
 
             // Atomic: update order + create history
             var supportsTransactions = _db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory";
@@ -62,6 +72,12 @@ namespace AuraNova.Infrastructure.Orders
             {
                 order.Status = newStatus;
                 order.UpdatedAt = DateTimeOffset.UtcNow;
+
+                // El panel acepta la cotización en nombre del cliente (p. ej. lo confirmó por WhatsApp)
+                if (oldStatus == OrderStatus.QuoteReady && newStatus == OrderStatus.WaitingPayment && order.Payment == null)
+                {
+                    _db.Payments.Add(new Payment { OrderId = order.Id, Amount = order.Total!.Value });
+                }
 
                 // Return stock if the order is cancelled (atomic increment, safe with concurrent orders)
                 if (newStatus == OrderStatus.Cancelled && oldStatus != OrderStatus.Cancelled)

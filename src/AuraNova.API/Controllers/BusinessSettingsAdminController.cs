@@ -5,6 +5,7 @@ using AuraNova.Application.BusinessSettings.DTOs;
 using AuraNova.Application.BusinessSettings.Interfaces;
 using AuraNova.Application.Audit.Interfaces;
 using AuraNova.API.Extensions;
+using AuraNova.API.Configuration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -49,6 +50,30 @@ namespace AuraNova.API.Controllers
             catch (ArgumentException ex)
             {
                 return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        [HttpGet("/api/admin/customization-options")]
+        public async Task<IActionResult> GetCustomizationOptions()
+        {
+            return Ok(await _service.GetCustomizationOptionsAsync());
+        }
+
+        /// <summary>Paleta de colores y tipos de flor que el panel ofrece al crear productos.</summary>
+        [HttpPut("/api/admin/customization-options")]
+        [EvictCatalogCache]
+        public async Task<IActionResult> UpdateCustomizationOptions([FromBody] CustomizationOptionsDto request)
+        {
+            try
+            {
+                var result = await _service.UpdateCustomizationOptionsAsync(request);
+                await this.LogActionAsync(_auditService, "UpdateCustomizationOptions", "BusinessSettings", null,
+                    $"Opciones de personalización actualizadas ({result.Colors.Count} colores, {result.FlowerTypes.Count} flores).");
+                return Ok(result);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
             }
         }
 

@@ -134,12 +134,12 @@ namespace AuraNova.UnitTests
             var service = CreateService(db);
 
             // Create a fake stream that reports a large length but doesn't actually allocate memory
-            var stream = new MockLargeStream(6 * 1024 * 1024); // 6MB
+            var stream = new MockLargeStream(11 * 1024 * 1024); // 11MB
 
             var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
                 service.ReportEvidenceAsync(order.Id, stream, "large.jpg", "image/jpeg"));
 
-            Assert.Contains("menor a 5 MB", ex.Message);
+            Assert.Contains("menor a 10 MB", ex.Message);
         }
 
         [Fact]

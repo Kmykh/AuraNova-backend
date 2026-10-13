@@ -14,6 +14,7 @@ namespace AuraNova.Infrastructure.Persistence
 
         public DbSet<Category> Categories { get; set; } = null!;
         public DbSet<Product> Products { get; set; } = null!;
+        public DbSet<ProductImage> ProductImages { get; set; } = null!;
         public DbSet<Customer> Customers { get; set; } = null!;
         public DbSet<DeliveryZone> DeliveryZones { get; set; } = null!;
         public DbSet<MeetingPoint> MeetingPoints { get; set; } = null!;

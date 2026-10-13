@@ -46,6 +46,64 @@ namespace AuraNova.Infrastructure.Orders
             return order == null ? null : await MapAsync(order);
         }
 
+        public async Task<OrderPaymentSummaryResponse?> GetPaymentSummaryAsync(System.Guid orderId)
+        {
+            var order = await _db.Orders
+                .AsNoTracking()
+                .Include(o => o.Items!).ThenInclude(i => i.Product)
+                .Include(o => o.Quote)
+                .Include(o => o.Payment)
+                .Include(o => o.DeliveryZone)
+                .Include(o => o.MeetingPoint)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            if (order == null)
+                return null;
+
+            return new OrderPaymentSummaryResponse
+            {
+                OrderId = order.Id,
+                OrderCode = order.OrderCode,
+                Status = order.Status.ToString(),
+                StatusLabel = OrderStatusLabels.GetLabel(order.Status),
+                DeliveryType = order.DeliveryType.ToString(),
+                DeliveryPlace = order.DeliveryType switch
+                {
+                    Domain.Enums.DeliveryType.MeetingPoint => order.MeetingPoint?.Name,
+                    Domain.Enums.DeliveryType.Delivery => order.DeliveryZone?.Name,
+                    _ => string.Join(", ", new[] { order.District, order.Province, order.Department }.Where(p => !string.IsNullOrWhiteSpace(p)))
+                },
+                IsCustomOrder = order.IsCustomOrder,
+                Subtotal = order.Subtotal,
+                DeliveryCost = order.DeliveryCost,
+                CustomizationCost = order.CustomizationCost,
+                Total = order.Total,
+                QuoteNotes = order.Quote?.Notes,
+                QuotedAt = order.Quote?.QuotedAt,
+                PaymentStatus = order.Payment?.Status.ToString(),
+                PaymentAmount = order.Payment?.Amount,
+                PaymentRejectionReason = order.Payment?.Status == Domain.Enums.PaymentStatus.Rejected ? order.Payment.Notes : null,
+                CreatedAt = order.CreatedAt,
+                Items = MapItems(order)
+            };
+        }
+
+        private static List<PublicTrackingItemResponse> MapItems(Order order) => order.Items == null
+            ? new List<PublicTrackingItemResponse>()
+            : order.Items.Select(i => new PublicTrackingItemResponse
+            {
+                ProductName = i.Product?.Name ?? "Producto Desconocido",
+                Quantity = i.Quantity,
+                UnitPrice = i.UnitPrice,
+                ImageUrl = i.Product?.ImageUrl,
+                SelectedColors = i.SelectedColors ?? [],
+                SelectedFlowerTypes = i.SelectedFlowerTypes ?? [],
+                HasLights = i.HasLights,
+                HasButterfly = i.HasButterfly,
+                HasPhraseCard = i.HasPhraseCard,
+                PhraseText = i.PhraseText
+            }).ToList();
+
         private IQueryable<Order> OrdersWithDetails() => _db.Orders
             .AsNoTracking()
             .Include(o => o.Customer)
@@ -135,15 +193,7 @@ namespace AuraNova.Infrastructure.Orders
                 } : null,
 
                 Timeline = timeline,
-                Items = order.Items == null
-                    ? new List<PublicTrackingItemResponse>()
-                    : order.Items.Select(i => new PublicTrackingItemResponse
-                    {
-                        ProductName = i.Product?.Name ?? "Producto Desconocido",
-                        Quantity = i.Quantity,
-                        UnitPrice = i.UnitPrice,
-                        ImageUrl = i.Product?.ImageUrl
-                    }).ToList(),
+                Items = MapItems(order),
                 Delivery = new PublicTrackingDeliveryResponse
                 {
                     DeliveryZoneName = order.DeliveryZone?.Name,

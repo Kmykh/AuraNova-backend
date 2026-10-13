@@ -23,6 +23,8 @@ namespace AuraNova.Application.Orders.DTOs
         public decimal UnitPrice { get; set; }
         public decimal Subtotal { get; set; }
 
+        public List<string> SelectedColors { get; set; } = new List<string>();
+        public List<string> SelectedFlowerTypes { get; set; } = new List<string>();
         public string? SelectedPrimaryColor { get; set; }
         public string? SelectedSecondaryColor { get; set; }
         public string? SelectedFlowerType { get; set; }

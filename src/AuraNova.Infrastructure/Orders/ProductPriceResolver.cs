@@ -68,6 +68,8 @@ namespace AuraNova.Infrastructure.Orders
                     sp.Price,
                     sp.CampaignStageId,
                     CampaignStageName = sp.CampaignStage!.Name,
+                    StageEndDate = sp.CampaignStage.EndDate,
+                    CampaignEndDate = sp.CampaignProduct!.Campaign!.EndDate,
                     CampaignId = sp.CampaignProduct!.CampaignId,
                     CampaignName = sp.CampaignProduct!.Campaign!.Name
                 })
@@ -83,7 +85,10 @@ namespace AuraNova.Infrastructure.Orders
                     CampaignId = activeCampaignPrice.CampaignId,
                     CampaignName = activeCampaignPrice.CampaignName,
                     CampaignStageId = activeCampaignPrice.CampaignStageId,
-                    CampaignStageName = activeCampaignPrice.CampaignStageName
+                    CampaignStageName = activeCampaignPrice.CampaignStageName,
+                    CampaignStageEndDate = activeCampaignPrice.StageEndDate < activeCampaignPrice.CampaignEndDate
+                        ? activeCampaignPrice.StageEndDate
+                        : activeCampaignPrice.CampaignEndDate
                 };
             }
 
@@ -122,6 +127,8 @@ namespace AuraNova.Infrastructure.Orders
                     sp.Price,
                     sp.CampaignStageId,
                     CampaignStageName = sp.CampaignStage!.Name,
+                    StageEndDate = sp.CampaignStage.EndDate,
+                    CampaignEndDate = sp.CampaignProduct!.Campaign!.EndDate,
                     CampaignId = sp.CampaignProduct!.CampaignId,
                     CampaignName = sp.CampaignProduct!.Campaign!.Name
                 })
@@ -143,7 +150,10 @@ namespace AuraNova.Infrastructure.Orders
                         CampaignId = campaign.CampaignId,
                         CampaignName = campaign.CampaignName,
                         CampaignStageId = campaign.CampaignStageId,
-                        CampaignStageName = campaign.CampaignStageName
+                        CampaignStageName = campaign.CampaignStageName,
+                        CampaignStageEndDate = campaign.StageEndDate < campaign.CampaignEndDate
+                            ? campaign.StageEndDate
+                            : campaign.CampaignEndDate
                     }
                     : new ProductPriceResolutionResult
                     {

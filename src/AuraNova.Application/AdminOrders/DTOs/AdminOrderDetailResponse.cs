@@ -91,10 +91,13 @@ namespace AuraNova.Application.AdminOrders.DTOs
     {
         public Guid ProductId { get; set; }
         public string ProductName { get; set; } = string.Empty;
+        public string? ImageUrl { get; set; }
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal Subtotal { get; set; }
 
+        public List<string> SelectedColors { get; set; } = new List<string>();
+        public List<string> SelectedFlowerTypes { get; set; } = new List<string>();
         public string? SelectedPrimaryColor { get; set; }
         public string? SelectedSecondaryColor { get; set; }
         public string? SelectedFlowerType { get; set; }
@@ -104,6 +107,8 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public bool HasPhraseCard { get; set; }
         public string? PhraseText { get; set; }
         public string? PhraseFont { get; set; }
+        public string? AppliedCampaignName { get; set; }
+        public string? AppliedCampaignStageName { get; set; }
     }
 
     public class AdminOrderStatusHistory

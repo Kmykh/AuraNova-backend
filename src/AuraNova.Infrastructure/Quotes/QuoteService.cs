@@ -1,3 +1,4 @@
+using AuraNova.Application.Orders;
 using AuraNova.Application.Quotes.DTOs;
 using AuraNova.Application.Quotes.Interfaces;
 using AuraNova.Application.Notifications.Interfaces;
@@ -74,10 +75,12 @@ namespace AuraNova.Infrastructure.Quotes
 
             var order = quote.Order!;
 
-            // Validate order is in correct status
-            if (order.Status != OrderStatus.WaitingQuote)
+            // Se puede cotizar y también corregir el precio mientras el cliente no lo haya aceptado
+            if (order.Status != OrderStatus.WaitingQuote && order.Status != OrderStatus.QuoteReady)
                 throw new OrderValidationException(
-                    $"El pedido '{order.OrderCode}' no está en estado WaitingQuote. Estado actual: {order.Status}.");
+                    $"El pedido '{order.OrderCode}' ya no admite cambios de precio. Estado actual: {OrderStatusLabels.GetLabel(order.Status)}.");
+
+            var isRequote = order.Status == OrderStatus.QuoteReady;
 
             // Validate shipping cost
             if (request.ShippingCost < 0)
@@ -98,9 +101,13 @@ namespace AuraNova.Infrastructure.Quotes
             quote.QuotedAt = DateTimeOffset.UtcNow;
             quote.UpdatedAt = DateTimeOffset.UtcNow;
 
-            // Update Order
+            // Update Order: el total queda guardado en el pedido (es lo que ven el cliente, el pago y el panel)
+            var total = order.Subtotal + (order.DeliveryCost ?? 0m) + request.CustomizationCost;
+            if (total <= 0)
+                throw new OrderValidationException("Ingresa el precio del pedido: el total no puede ser S/ 0.");
+
             order.CustomizationCost = request.CustomizationCost;
-            order.Total = order.Subtotal + (order.DeliveryCost ?? 0m) + request.CustomizationCost;
+            order.Total = total;
             order.Status = OrderStatus.QuoteReady;
             order.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -108,7 +115,9 @@ namespace AuraNova.Infrastructure.Quotes
             {
                 OrderId = order.Id,
                 Status = OrderStatus.QuoteReady,
-                Comment = $"Cotización lista. Envío: S/ {(order.DeliveryCost ?? 0m):F2}",
+                Comment = isRequote
+                    ? $"Cotización actualizada. Nuevo total: S/ {total:F2}"
+                    : $"Cotización lista. Total: S/ {total:F2}",
                 AdminUserId = _currentUserService.UserId,
                 AdminName = _currentUserService.Name
             });

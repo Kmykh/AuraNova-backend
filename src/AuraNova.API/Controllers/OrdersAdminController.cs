@@ -41,6 +41,13 @@ namespace AuraNova.API.Controllers
             return Ok(response);
         }
 
+        /// <summary>Cantidad de pedidos por estado (pestañas del panel).</summary>
+        [HttpGet("counts")]
+        public async Task<IActionResult> GetCounts()
+        {
+            return Ok(await _queryService.GetCountsAsync());
+        }
+
         [HttpGet("{id:guid}")]
         public async Task<IActionResult> GetOrderDetail(Guid id)
         {

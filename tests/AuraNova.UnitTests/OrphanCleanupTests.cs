@@ -30,9 +30,12 @@ namespace AuraNova.UnitTests
         public async Task Cleanup_DeletesOnlyUnusedOldFiles()
         {
             using var db = GetInMemoryDb();
+            var withGallery = new Product { Name = "A", Price = 1, ImageUrl = "products/in-use.webp" };
             db.Products.AddRange(
-                new Product { Name = "A", Price = 1, ImageUrl = "products/in-use.webp" },
+                withGallery,
                 new Product { Name = "B", Price = 1, ImageUrl = $"{TestUrlResolver.PublicBase}/products/in-use-absolute.webp" });
+            // Foto secundaria de la galería: no es portada, pero está en uso
+            db.ProductImages.Add(new ProductImage { ProductId = withGallery.Id, Path = "products/gallery-2.webp", SortOrder = 1 });
             await db.SaveChangesAsync();
 
             var old = DateTimeOffset.UtcNow.AddDays(-3);
@@ -40,6 +43,7 @@ namespace AuraNova.UnitTests
             storage.Files.AddRange([
                 new StoredFileInfo("products/in-use.webp", 100, old),
                 new StoredFileInfo("products/in-use-absolute.webp", 100, old),
+                new StoredFileInfo("products/gallery-2.webp", 100, old),
                 new StoredFileInfo("products/orphan.png", 2_000_000, old),
                 new StoredFileInfo("products/.emptyFolderPlaceholder", 0, old),
                 new StoredFileInfo("products/just-uploaded.webp", 150_000, DateTimeOffset.UtcNow.AddMinutes(-5))

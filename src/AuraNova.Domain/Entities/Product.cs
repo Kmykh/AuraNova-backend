@@ -26,6 +26,9 @@ namespace AuraNova.Domain.Entities
         public bool AllowsButterfly { get; set; } = false;
         public bool AllowsPhraseCard { get; set; } = false;
 
+        /// <summary>Galería ordenada; la primera es la portada (igual a <see cref="ImageUrl"/>).</summary>
+        public ICollection<ProductImage>? Images { get; set; }
+
         public ICollection<OrderItem>? OrderItems { get; set; }
 
         public Product()

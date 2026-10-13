@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace AuraNova.Domain.Entities
 {
@@ -15,7 +16,11 @@ namespace AuraNova.Domain.Entities
         public decimal UnitPrice { get; set; }
         public decimal Subtotal { get; set; }
 
-        // Customer Selection
+        // Customer Selection: una opción por elemento de la lista (nunca texto separado por comas)
+        public List<string> SelectedColors { get; set; } = new List<string>();
+        public List<string> SelectedFlowerTypes { get; set; } = new List<string>();
+
+        // Campos anteriores: se siguen llenando (primer color / primera flor) para no romper reportes viejos
         public string? SelectedPrimaryColor { get; set; }
         public string? SelectedSecondaryColor { get; set; }
         public string? SelectedFlowerType { get; set; }
