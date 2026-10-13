@@ -154,7 +154,7 @@ namespace AuraNova.UnitTests
             Assert.NotNull(result);
             Assert.Equal("Delivery", result.DeliveryType);
             Assert.Equal("WaitingPayment", result.Status);
-            Assert.StartsWith("PED-", result.OrderCode);
+            Assert.Equal("AN-1001", result.OrderCode);
         }
 
         [Fact]

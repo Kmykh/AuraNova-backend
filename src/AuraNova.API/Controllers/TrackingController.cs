@@ -15,6 +15,21 @@ namespace AuraNova.API.Controllers
             _trackingService = trackingService;
         }
 
+        /// <summary>
+        /// Seguimiento con un solo código ("K7M3-Q9XA"). Es lo que usan el enlace /seguimiento/{código} y el buscador.
+        /// </summary>
+        [HttpGet("/api/public/tracking/{trackingCode}")]
+        [EnableRateLimiting("tracking_policy")]
+        public async Task<IActionResult> GetTrackingByCode(string trackingCode)
+        {
+            var result = await _trackingService.GetTrackingByCodeAsync(trackingCode);
+            if (result == null)
+                return NotFound(new { message = "No encontramos un pedido con ese código de seguimiento." });
+
+            return Ok(result);
+        }
+
+        /// <summary>Formato anterior (número de pedido + token). Se mantiene para enlaces ya enviados.</summary>
         [HttpGet("{orderCode}/tracking/{trackingToken}")]
         [EnableRateLimiting("tracking_policy")]
         public async Task<IActionResult> GetTracking(string orderCode, string trackingToken)

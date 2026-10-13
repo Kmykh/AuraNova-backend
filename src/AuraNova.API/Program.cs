@@ -175,6 +175,9 @@ builder.Services.AddScoped<AuraNova.Application.Orders.Interfaces.IOrderTracking
 // Public App settings
 
 
+// Public site URL used in customer messages (tracking links)
+builder.Services.Configure<AuraNova.Infrastructure.Notifications.PublicSiteSettings>(builder.Configuration.GetSection("PublicSite"));
+
 // register notification services
 builder.Services.AddScoped<AuraNova.Application.Notifications.Interfaces.INotificationTemplateService, AuraNova.Infrastructure.Notifications.NotificationTemplateService>();
 builder.Services.AddScoped<AuraNova.Application.Notifications.Interfaces.INotificationService, AuraNova.Infrastructure.Notifications.NotificationService>();

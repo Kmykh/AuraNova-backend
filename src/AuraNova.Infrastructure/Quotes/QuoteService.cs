@@ -33,11 +33,14 @@ namespace AuraNova.Infrastructure.Quotes
             var quotes = await _db.Quotes
                 .Include(q => q.Order)
                     .ThenInclude(o => o!.Customer)
+                .Include(q => q.Order)
+                    .ThenInclude(o => o!.ReferenceImages)
                 .OrderByDescending(q => q.CreatedAt)
                 .ToListAsync();
 
             var imageUrls = await _storage.GetReadUrlsAsync(quotes
-                .Select(q => q.Order?.ReferenceImageUrl)
+                .Where(q => q.Order != null)
+                .SelectMany(q => CustomOrderBrief.StoredPaths(q.Order!).Append(q.Order!.ReferenceImageUrl))
                 .OfType<string>());
 
             return quotes.Select(q => MapToResponse(q, imageUrls)).ToList();
@@ -48,6 +51,8 @@ namespace AuraNova.Infrastructure.Quotes
             var quote = await _db.Quotes
                 .Include(q => q.Order)
                     .ThenInclude(o => o!.Customer)
+                .Include(q => q.Order)
+                    .ThenInclude(o => o!.ReferenceImages)
                 .FirstOrDefaultAsync(q => q.Id == id);
 
             if (quote == null) return null;
@@ -60,6 +65,8 @@ namespace AuraNova.Infrastructure.Quotes
             var quote = await _db.Quotes
                 .Include(q => q.Order)
                     .ThenInclude(o => o!.Customer)
+                .Include(q => q.Order)
+                    .ThenInclude(o => o!.ReferenceImages)
                 .FirstOrDefaultAsync(q => q.Id == id);
 
             if (quote == null)
@@ -120,8 +127,9 @@ namespace AuraNova.Infrastructure.Quotes
 
         private async Task<QuoteResponse> MapToResponseAsync(Quote quote)
         {
-            var imageUrls = await _storage.GetReadUrlsAsync(
-                new[] { quote.Order?.ReferenceImageUrl }.OfType<string>());
+            var imageUrls = await _storage.GetReadUrlsAsync(quote.Order == null
+                ? []
+                : CustomOrderBrief.StoredPaths(quote.Order).Append(quote.Order.ReferenceImageUrl).OfType<string>());
             return MapToResponse(quote, imageUrls);
         }
 
@@ -148,7 +156,12 @@ namespace AuraNova.Infrastructure.Quotes
                 // Signed URL: reference images live in the private bucket
                 ReferenceImageUrl = order.ReferenceImageUrl == null ? null : imageUrls.GetValueOrDefault(order.ReferenceImageUrl),
                 CustomizationNotes = order.CustomizationNotes,
-                DeliveryType = order.DeliveryType.ToString()
+                DeliveryType = order.DeliveryType.ToString(),
+                ReferenceImages = CustomOrderBrief.ImageUrls(order, imageUrls),
+                ReferenceLinks = order.ReferenceLinks ?? [],
+                DesiredDate = order.DesiredDate,
+                Occasion = order.Occasion,
+                BudgetRange = order.BudgetRange
             };
 
             return response;

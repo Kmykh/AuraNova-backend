@@ -3,17 +3,23 @@ using AuraNova.Application.BusinessSettings.Interfaces;
 using AuraNova.Application.Notifications.Interfaces;
 using AuraNova.Domain.Entities;
 using AuraNova.Domain.Enums;
+using Microsoft.Extensions.Options;
 
 namespace AuraNova.Infrastructure.Notifications
 {
     public class NotificationTemplateService : INotificationTemplateService
     {
         private readonly IBusinessSettingsService _settingsService;
+        private readonly string _siteUrl;
 
-        public NotificationTemplateService(IBusinessSettingsService settingsService)
+        public NotificationTemplateService(IBusinessSettingsService settingsService, IOptions<PublicSiteSettings>? siteOptions = null)
         {
             _settingsService = settingsService;
+            _siteUrl = (siteOptions?.Value.BaseUrl ?? new PublicSiteSettings().BaseUrl).TrimEnd('/');
         }
+
+        /// <summary>Enlace directo al seguimiento: el cliente no necesita escribir ningún código.</summary>
+        private string TrackingUrl(Order order) => $"{_siteUrl}/seguimiento/{order.TrackingToken}";
 
         private string GetName(Order order) => order.Customer?.Name ?? "Cliente";
         private async Task<string> GetBusinessNameAsync() 
@@ -37,8 +43,9 @@ namespace AuraNova.Infrastructure.Notifications
                     
                     En breve revisaremos tus indicaciones y la imagen de referencia para enviarte la cotización.
                     
-                    Tu código de pedido es: {order.OrderCode}
-                    Tu token de seguridad es: {order.TrackingToken}
+                    Pedido: {order.OrderCode}
+                    Código de seguimiento: {order.TrackingToken}
+                    Síguelo aquí: {TrackingUrl(order)}
                     
                     Gracias por elegir {businessName}
                     """.Replace("                    ", "");
@@ -53,8 +60,9 @@ namespace AuraNova.Infrastructure.Notifications
                     
                     En breve calcularemos el costo de envío exacto y te enviaremos la cotización.
                     
-                    Tu código de pedido es: {order.OrderCode}
-                    Tu token de seguridad es: {order.TrackingToken}
+                    Pedido: {order.OrderCode}
+                    Código de seguimiento: {order.TrackingToken}
+                    Síguelo aquí: {TrackingUrl(order)}
                     
                     Gracias por elegir {businessName}
                     """.Replace("                    ", "");
@@ -69,8 +77,9 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Por favor, realiza el pago mediante Yape y sube la evidencia en nuestra plataforma para que podamos confirmarlo.
                 
-                Tu código de pedido es: {order.OrderCode}
-                Tu token de seguridad es: {order.TrackingToken}
+                Pedido: {order.OrderCode}
+                Código de seguimiento: {order.TrackingToken}
+                Síguelo aquí: {TrackingUrl(order)}
                 
                 Gracias por elegir {businessName}
                 """.Replace("                ", "");
@@ -95,8 +104,9 @@ namespace AuraNova.Infrastructure.Notifications
                     Envío: S/ {shippingCost:F2}
                     Total a pagar: S/ {total:F2}
                     
-                    Tu código de pedido es: {order.OrderCode}
-                    Tu token de seguridad es: {order.TrackingToken}
+                    Pedido: {order.OrderCode}
+                    Código de seguimiento: {order.TrackingToken}
+                    Síguelo aquí: {TrackingUrl(order)}
                     
                     Gracias por elegir {businessName}
                     """.Replace("                    ", "");
@@ -111,8 +121,9 @@ namespace AuraNova.Infrastructure.Notifications
                 Envío: S/ {shippingCost:F2}
                 Total: S/ {total:F2}
                 
-                Tu código de pedido es: {order.OrderCode}
-                Tu token de seguridad es: {order.TrackingToken}
+                Pedido: {order.OrderCode}
+                Código de seguimiento: {order.TrackingToken}
+                Síguelo aquí: {TrackingUrl(order)}
                 
                 Gracias por elegir {businessName}
                 """.Replace("                ", "");
@@ -128,8 +139,9 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Nuestro equipo verificará el pago y te avisaremos cuando haya sido confirmado.
                 
-                Tu código de pedido es: {order.OrderCode}
-                Tu token de seguridad es: {order.TrackingToken}
+                Pedido: {order.OrderCode}
+                Código de seguimiento: {order.TrackingToken}
+                Síguelo aquí: {TrackingUrl(order)}
                 """.Replace("                ", "");
         }
 
@@ -143,8 +155,9 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Ahora comenzaremos a preparar tu pedido.
                 
-                Tu código de pedido es: {order.OrderCode}
-                Tu token de seguridad es: {order.TrackingToken}
+                Pedido: {order.OrderCode}
+                Código de seguimiento: {order.TrackingToken}
+                Síguelo aquí: {TrackingUrl(order)}
                 
                 Gracias por elegir {businessName}
                 """.Replace("                ", "");
@@ -163,8 +176,9 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Puedes volver a realizar el proceso de pago y enviar una nueva evidencia.
                 
-                Tu código de pedido es: {order.OrderCode}
-                Tu token de seguridad es: {order.TrackingToken}
+                Pedido: {order.OrderCode}
+                Código de seguimiento: {order.TrackingToken}
+                Síguelo aquí: {TrackingUrl(order)}
                 """.Replace("                ", "");
         }
 
@@ -178,8 +192,9 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Te avisaremos cuando esté listo.
                 
-                Tu código de pedido es: {order.OrderCode}
-                Tu token de seguridad es: {order.TrackingToken}
+                Pedido: {order.OrderCode}
+                Código de seguimiento: {order.TrackingToken}
+                Síguelo aquí: {TrackingUrl(order)}
                 """.Replace("                ", "");
         }
 
@@ -197,8 +212,9 @@ namespace AuraNova.Infrastructure.Notifications
                     
                     Pronto coordinaremos la entrega contigo.
                     
-                    Tu código de pedido es: {order.OrderCode}
-                    Tu token de seguridad es: {order.TrackingToken}
+                    Pedido: {order.OrderCode}
+                    Código de seguimiento: {order.TrackingToken}
+                    Síguelo aquí: {TrackingUrl(order)}
                     """.Replace("                    ", "");
             }
 
@@ -207,8 +223,9 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Tu pedido {order.OrderCode} ya está listo para recoger en el punto de encuentro.
                 
-                Tu código de pedido es: {order.OrderCode}
-                Tu token de seguridad es: {order.TrackingToken}
+                Pedido: {order.OrderCode}
+                Código de seguimiento: {order.TrackingToken}
+                Síguelo aquí: {TrackingUrl(order)}
                 """.Replace("                ", "");
         }
 
@@ -220,8 +237,9 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Tu pedido {order.OrderCode} ya fue enviado.
                 
-                Tu código de pedido es: {order.OrderCode}
-                Tu token de seguridad es: {order.TrackingToken}
+                Pedido: {order.OrderCode}
+                Código de seguimiento: {order.TrackingToken}
+                Síguelo aquí: {TrackingUrl(order)}
                 """.Replace("                ", "");
         }
 
@@ -235,8 +253,9 @@ namespace AuraNova.Infrastructure.Notifications
                 
                 Gracias por confiar en {businessName}
                 
-                Tu código de pedido es: {order.OrderCode}
-                Tu token de seguridad es: {order.TrackingToken}
+                Pedido: {order.OrderCode}
+                Código de seguimiento: {order.TrackingToken}
+                Síguelo aquí: {TrackingUrl(order)}
                 """.Replace("                ", "");
         }
 

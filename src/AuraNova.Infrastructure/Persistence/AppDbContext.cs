@@ -19,6 +19,7 @@ namespace AuraNova.Infrastructure.Persistence
         public DbSet<MeetingPoint> MeetingPoints { get; set; } = null!;
         public DbSet<Order> Orders { get; set; } = null!;
         public DbSet<OrderItem> OrderItems { get; set; } = null!;
+        public DbSet<OrderReferenceImage> OrderReferenceImages { get; set; } = null!;
         public DbSet<Quote> Quotes { get; set; } = null!;
         public DbSet<Payment> Payments { get; set; } = null!;
         public DbSet<OrderStatusHistory> OrderStatusHistory { get; set; } = null!;
