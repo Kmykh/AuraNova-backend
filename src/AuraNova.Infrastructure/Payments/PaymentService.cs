@@ -72,7 +72,15 @@ namespace AuraNova.Infrastructure.Payments
 
             var payment = order.Payment;
             if (payment == null)
-                throw new OrderValidationException($"El pedido '{order.OrderCode}' no tiene un pago generado.");
+            {
+                // Pedidos que pasaron a "esperando pago" sin registro de pago (flujo anterior del panel):
+                // se genera aquí por el total ya cotizado en lugar de bloquear al cliente.
+                if (order.Total is not > 0)
+                    throw new OrderValidationException($"El pedido '{order.OrderCode}' todavía no tiene un precio confirmado.");
+
+                payment = new Payment { OrderId = order.Id, Amount = order.Total.Value };
+                _db.Payments.Add(payment);
+            }
 
             if (payment.Status == PaymentStatus.Confirmed)
                 throw new OrderValidationException($"El pago del pedido '{order.OrderCode}' ya está confirmado.");

@@ -69,6 +69,7 @@ namespace AuraNova.Application.AdminOrders.DTOs
 
     public class AdminOrderQuote
     {
+        public Guid QuoteId { get; set; }
         public string QuoteStatus { get; set; } = string.Empty;
         public decimal ShippingCost { get; set; }
         public decimal CustomizationCost { get; set; }

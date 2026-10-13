@@ -112,6 +112,24 @@ namespace AuraNova.UnitTests
         }
 
         [Fact]
+        public async Task ReportEvidenceAsync_WaitingPaymentWithoutPayment_ShouldCreateItFromTotal()
+        {
+            using var db = GetInMemoryDb(Guid.NewGuid().ToString());
+            var order = new Order { OrderCode = "AN-1001", Status = OrderStatus.WaitingPayment, Total = 120m };
+            db.Orders.Add(order);
+            await db.SaveChangesAsync();
+            var service = CreateService(db);
+
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes("fake image content"));
+            var result = await service.ReportEvidenceAsync(order.Id, stream, "evidence.jpg", "image/jpeg");
+
+            Assert.Equal("Reported", result.Status);
+            var payment = await db.Payments.SingleAsync(p => p.OrderId == order.Id);
+            Assert.Equal(120m, payment.Amount);
+            Assert.Equal(OrderStatus.PaymentReported, (await db.Orders.FindAsync(order.Id))!.Status);
+        }
+
+        [Fact]
         public async Task ReportEvidenceAsync_ShouldRejectInvalidExtension()
         {
             using var db = GetInMemoryDb(Guid.NewGuid().ToString());

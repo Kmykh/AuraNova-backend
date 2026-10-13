@@ -287,6 +287,7 @@ namespace AuraNova.Infrastructure.Orders
             {
                 response.Quote = new AdminOrderQuote
                 {
+                    QuoteId = order.Quote.Id,
                     QuoteStatus = order.Quote.Status.ToString(),
                     ShippingCost = order.Quote.ShippingCost ?? 0m,
                     CustomizationCost = order.Quote.CustomizationCost,
