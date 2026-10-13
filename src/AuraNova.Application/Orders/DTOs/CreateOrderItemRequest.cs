@@ -10,6 +10,12 @@ namespace AuraNova.Application.Orders.DTOs
         [Range(1, int.MaxValue, ErrorMessage = "La cantidad debe ser mayor a 0.")]
         public int Quantity { get; set; }
 
+        /// <summary>Colores elegidos, uno por elemento.</summary>
+        public List<string>? SelectedColors { get; set; }
+        /// <summary>Tipos de flor elegidos, uno por elemento.</summary>
+        public List<string>? SelectedFlowerTypes { get; set; }
+
+        // Formato anterior (texto). Se acepta mientras haya clientes con la versión vieja de la web.
         public string? SelectedPrimaryColor { get; set; }
         public string? SelectedSecondaryColor { get; set; }
         public string? SelectedFlowerType { get; set; }

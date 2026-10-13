@@ -29,6 +29,26 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
             builder.Property(oi => oi.SelectedFlowerColor).HasMaxLength(50);
             builder.Property(oi => oi.PhraseText).HasMaxLength(1000);
             builder.Property(oi => oi.PhraseFont).HasMaxLength(50);
+
+            // Opciones elegidas como lista JSON: una por elemento
+            var stringListComparer = new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<string>>(
+                (c1, c2) => (c1 != null ? c1.Count : 0) == (c2 != null ? c2.Count : 0) && (c1 == null || c1.SequenceEqual(c2!)),
+                c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                c => c.ToList());
+
+            builder.Property(oi => oi.SelectedColors)
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<string>())
+                .Metadata.SetValueComparer(stringListComparer);
+            builder.Property(oi => oi.SelectedColors).HasDefaultValueSql("'[]'");
+
+            builder.Property(oi => oi.SelectedFlowerTypes)
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<string>())
+                .Metadata.SetValueComparer(stringListComparer);
+            builder.Property(oi => oi.SelectedFlowerTypes).HasDefaultValueSql("'[]'");
         }
     }
 }

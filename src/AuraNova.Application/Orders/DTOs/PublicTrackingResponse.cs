@@ -75,6 +75,12 @@ namespace AuraNova.Application.Orders.DTOs
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public string? ImageUrl { get; set; }
+        public List<string> SelectedColors { get; set; } = new List<string>();
+        public List<string> SelectedFlowerTypes { get; set; } = new List<string>();
+        public bool HasLights { get; set; }
+        public bool HasButterfly { get; set; }
+        public bool HasPhraseCard { get; set; }
+        public string? PhraseText { get; set; }
     }
 
     public class TrackingTimelineItem

@@ -210,5 +210,84 @@ namespace AuraNova.UnitTests
 
             storage.Verify(s => s.DeleteAsync(Moq.It.IsAny<string>()), Moq.Times.Never);
         }
+
+        [Fact]
+        public async Task Gallery_CreateAndReorder_KeepsCoverInSync_AndDeletesRemovedPhotos()
+        {
+            using var db = GetInMemoryDb();
+            var priceResolver = new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            var storage = new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>();
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object, storage.Object);
+
+            var created = await service.CreateAsync(new CreateProductRequest
+            {
+                Name = "Ramo", Price = 10, Stock = 5,
+                ImageUrls = ["products/a.webp", "products/b.webp", "products/c.webp"]
+            });
+            Assert.Equal("products/a.webp", created.ImageUrl);
+            Assert.Equal(["products/a.webp", "products/b.webp", "products/c.webp"], created.Images);
+
+            // Nueva portada (c), se quita b
+            var updated = await service.UpdateAsync(created.Id, new UpdateProductRequest
+            {
+                Name = "Ramo", Price = 10,
+                ImageUrls = ["products/c.webp", "products/a.webp"]
+            });
+
+            Assert.Equal("products/c.webp", updated!.ImageUrl);
+            Assert.Equal(["products/c.webp", "products/a.webp"], updated.Images);
+            storage.Verify(s => s.DeleteAsync("products/b.webp"), Moq.Times.Once);
+            storage.Verify(s => s.DeleteAsync("products/a.webp"), Moq.Times.Never);
+
+            var reloaded = await service.GetAdminByIdAsync(created.Id);
+            Assert.Equal(["products/c.webp", "products/a.webp"], reloaded!.Images);
+        }
+
+        [Fact]
+        public async Task Gallery_LegacyImageUrlUpdate_ReplacesOnlyTheCover()
+        {
+            using var db = GetInMemoryDb();
+            var priceResolver = new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            var storage = new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>();
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object, storage.Object);
+
+            var created = await service.CreateAsync(new CreateProductRequest
+            {
+                Name = "Ramo", Price = 10, Stock = 5, ImageUrls = ["products/a.webp", "products/b.webp"]
+            });
+
+            var updated = await service.UpdateAsync(created.Id, new UpdateProductRequest { Name = "Ramo", Price = 10, ImageUrl = "products/new.webp" });
+
+            Assert.Equal(["products/new.webp", "products/b.webp"], updated!.Images);
+        }
+
+        [Fact]
+        public async Task Options_WithCommas_AreRejected()
+        {
+            using var db = GetInMemoryDb();
+            var service = new ProductService(db, GetMockLogger(),
+                new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>().Object,
+                new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>().Object);
+
+            var ex = await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAsync(new CreateProductRequest
+            {
+                Name = "Ramo", Price = 10, Stock = 5, AvailableColors = ["Rojo, Blanco"]
+            }));
+            Assert.Contains("comas", ex.Message);
+        }
+
+        [Fact]
+        public async Task Gallery_RejectsUnsafePaths()
+        {
+            using var db = GetInMemoryDb();
+            var service = new ProductService(db, GetMockLogger(),
+                new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>().Object,
+                new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>().Object);
+
+            await Assert.ThrowsAsync<ArgumentException>(() => service.CreateAsync(new CreateProductRequest
+            {
+                Name = "Ramo", Price = 10, Stock = 5, ImageUrls = ["../customer-files/private/x.webp"]
+            }));
+        }
     }
 }

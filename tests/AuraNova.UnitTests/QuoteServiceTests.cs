@@ -142,7 +142,47 @@ namespace AuraNova.UnitTests
 
             var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
                 service.UpdateAsync(quote.Id, new UpdateQuoteRequest { ShippingCost = 20.00m }));
-            Assert.Contains("WaitingQuote", ex.Message);
+            Assert.Contains("ya no admite cambios de precio", ex.Message);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_ShouldSaveTotalOnOrder_AndAllowRequoteBeforeAcceptance()
+        {
+            using var db = GetInMemoryDb();
+            var (order, quote) = await SeedOrderWithQuote(db);
+            order.IsCustomOrder = true;
+            order.Subtotal = 0;
+            order.DeliveryCost = 8m;
+            await db.SaveChangesAsync();
+
+            var service = new QuoteService(db, new Mock<INotificationService>().Object, new Mock<ICurrentUserService>().Object,
+                new NullLogger<QuoteService>(), new TestStorage());
+
+            await service.UpdateAsync(quote.Id, new UpdateQuoteRequest { CustomizationCost = 120m });
+            Assert.Equal(128m, (await db.Orders.FindAsync(order.Id))!.Total);
+            Assert.Equal(OrderStatus.QuoteReady, order.Status);
+
+            // El cliente todavía no aceptó: se puede corregir el precio
+            var updated = await service.UpdateAsync(quote.Id, new UpdateQuoteRequest { CustomizationCost = 100m });
+            Assert.Equal(108m, updated.Total);
+            Assert.Equal(108m, (await db.Orders.FindAsync(order.Id))!.Total);
+        }
+
+        [Fact]
+        public async Task UpdateAsync_ShouldRejectZeroTotal()
+        {
+            using var db = GetInMemoryDb();
+            var (order, quote) = await SeedOrderWithQuote(db);
+            order.Subtotal = 0;
+            order.DeliveryCost = null;
+            await db.SaveChangesAsync();
+
+            var service = new QuoteService(db, new Mock<INotificationService>().Object, new Mock<ICurrentUserService>().Object,
+                new NullLogger<QuoteService>(), new TestStorage());
+
+            var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
+                service.UpdateAsync(quote.Id, new UpdateQuoteRequest { CustomizationCost = 0m }));
+            Assert.Contains("S/ 0", ex.Message);
         }
     }
 }

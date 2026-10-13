@@ -127,8 +127,20 @@ namespace AuraNova.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<string>("ColorPalette")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValueSql("'[]'");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FlowerTypeOptions")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValueSql("'[]'");
 
                     b.Property<string>("TikTokUsername")
                         .HasColumnType("text");
@@ -691,6 +703,12 @@ namespace AuraNova.Infrastructure.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<string>("SelectedColors")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValueSql("'[]'");
+
                     b.Property<string>("SelectedFlowerColor")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
@@ -698,6 +716,12 @@ namespace AuraNova.Infrastructure.Migrations
                     b.Property<string>("SelectedFlowerType")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SelectedFlowerTypes")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValueSql("'[]'");
 
                     b.Property<string>("SelectedPrimaryColor")
                         .HasMaxLength(50)
@@ -909,6 +933,35 @@ namespace AuraNova.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("AuraNova.Domain.Entities.ProductImage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Path");
+
+                    b.HasIndex("ProductId", "SortOrder");
+
+                    b.ToTable("ProductImages", (string)null);
+                });
+
             modelBuilder.Entity("AuraNova.Domain.Entities.Quote", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1107,6 +1160,17 @@ namespace AuraNova.Infrastructure.Migrations
                     b.Navigation("Category");
                 });
 
+            modelBuilder.Entity("AuraNova.Domain.Entities.ProductImage", b =>
+                {
+                    b.HasOne("AuraNova.Domain.Entities.Product", "Product")
+                        .WithMany("Images")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("AuraNova.Domain.Entities.Quote", b =>
                 {
                     b.HasOne("AuraNova.Domain.Entities.Order", "Order")
@@ -1167,6 +1231,8 @@ namespace AuraNova.Infrastructure.Migrations
 
             modelBuilder.Entity("AuraNova.Domain.Entities.Product", b =>
                 {
+                    b.Navigation("Images");
+
                     b.Navigation("OrderItems");
                 });
 #pragma warning restore 612, 618

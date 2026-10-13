@@ -26,7 +26,7 @@ namespace AuraNova.Infrastructure.Payments
         private readonly AuraNova.Application.Auth.Interfaces.ICurrentUserService _currentUserService;
         private readonly ILogger<PaymentService> _logger;
 
-        private const int MaxFileSizeMB = 5;
+        private const int MaxFileSizeMB = 10;
         private const long MaxFileSizeBytes = MaxFileSizeMB * 1024 * 1024;
         private readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
         private readonly string[] AllowedMimeTypes = { "image/jpeg", "image/png", "image/webp" };
@@ -72,7 +72,15 @@ namespace AuraNova.Infrastructure.Payments
 
             var payment = order.Payment;
             if (payment == null)
-                throw new OrderValidationException($"El pedido '{order.OrderCode}' no tiene un pago generado.");
+            {
+                // Pedidos que pasaron a "esperando pago" sin registro de pago (flujo anterior del panel):
+                // se genera aquí por el total ya cotizado en lugar de bloquear al cliente.
+                if (order.Total is not > 0)
+                    throw new OrderValidationException($"El pedido '{order.OrderCode}' todavía no tiene un precio confirmado.");
+
+                payment = new Payment { OrderId = order.Id, Amount = order.Total.Value };
+                _db.Payments.Add(payment);
+            }
 
             if (payment.Status == PaymentStatus.Confirmed)
                 throw new OrderValidationException($"El pago del pedido '{order.OrderCode}' ya está confirmado.");

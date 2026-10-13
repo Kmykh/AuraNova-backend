@@ -26,5 +26,6 @@ namespace AuraNova.Application.Orders.Interfaces
         
         public Guid? CampaignStageId { get; set; }
         public string? CampaignStageName { get; set; }
+        public DateTimeOffset? CampaignStageEndDate { get; set; }
     }
 }

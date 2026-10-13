@@ -494,21 +494,78 @@ namespace AuraNova.UnitTests
             Assert.Contains("al menos un producto", ex.Message);
         }
 
-        [Fact]
-        public async Task CreateAsync_ShouldRejectDuplicateProducts()
+        private OrderService BuildService(AppDbContext db)
         {
-            using var db = GetInMemoryDb();
-            var product = await SeedProduct(db);
-            var zone = await SeedDeliveryZone(db);
-            var notificationService = new Mock<INotificationService>();
-            var currentUserService = new Mock<ICurrentUserService>();
             var priceResolver = new Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
             priceResolver.Setup(x => x.ResolvePriceAsync(It.IsAny<Guid>(), It.IsAny<DateTimeOffset?>()))
                          .ReturnsAsync((Guid id, DateTimeOffset? dt) => new AuraNova.Application.Orders.Interfaces.ProductPriceResolutionResult
                          {
                              EffectivePrice = db.Products.FirstOrDefault(p => p.Id == id)?.Price ?? 0m
                          });
-            var service = new OrderService(db, notificationService.Object, GetLogger(), new OrderStatusTransitionService(), currentUserService.Object, priceResolver.Object);
+            return new OrderService(db, new Mock<INotificationService>().Object, GetLogger(), new OrderStatusTransitionService(),
+                new Mock<ICurrentUserService>().Object, priceResolver.Object);
+        }
+
+        [Fact]
+        public async Task CreateAsync_SameProductWithDifferentOptions_ShouldCreateOneLinePerCustomization()
+        {
+            using var db = GetInMemoryDb();
+            var product = await SeedProduct(db, stock: 10);
+            product.AvailableColors = ["Rojo", "Blanco", "Azul"];
+            await db.SaveChangesAsync();
+            var zone = await SeedDeliveryZone(db);
+            var service = BuildService(db);
+
+            var request = new CreateOrderRequest
+            {
+                Customer = new CreateOrderCustomerRequest { Name = "María", Phone = "999999999" },
+                Items = [
+                    new() { ProductId = product.Id, Quantity = 2, SelectedColors = ["Rojo"] },
+                    new() { ProductId = product.Id, Quantity = 3, SelectedColors = ["blanco", "Azul"] }
+                ],
+                Delivery = new CreateOrderDeliveryRequest { Type = "Delivery", DeliveryZoneId = zone.Id, DeliveryAddress = "test" }
+            };
+
+            var result = await service.CreateAsync(request);
+
+            Assert.Equal(2, result.Items.Count);
+            Assert.Equal(["Rojo"], result.Items[0].SelectedColors);
+            // Se guarda con el nombre exacto del producto y cada color por separado
+            Assert.Equal(["Blanco", "Azul"], result.Items[1].SelectedColors);
+            Assert.Equal(5, (await db.Products.FindAsync(product.Id))!.Stock);
+        }
+
+        [Fact]
+        public async Task CreateAsync_SameProductRepeated_ShouldValidateStockWithTotalQuantity()
+        {
+            using var db = GetInMemoryDb();
+            var product = await SeedProduct(db, stock: 4);
+            product.AvailableColors = ["Rojo", "Blanco"];
+            await db.SaveChangesAsync();
+            var zone = await SeedDeliveryZone(db);
+            var service = BuildService(db);
+
+            var request = new CreateOrderRequest
+            {
+                Customer = new CreateOrderCustomerRequest { Name = "María", Phone = "999999999" },
+                Items = [
+                    new() { ProductId = product.Id, Quantity = 2, SelectedColors = ["Rojo"] },
+                    new() { ProductId = product.Id, Quantity = 3, SelectedColors = ["Blanco"] }
+                ],
+                Delivery = new CreateOrderDeliveryRequest { Type = "Delivery", DeliveryZoneId = zone.Id, DeliveryAddress = "test" }
+            };
+
+            var ex = await Assert.ThrowsAsync<OrderValidationException>(() => service.CreateAsync(request));
+            Assert.Contains("Stock insuficiente", ex.Message);
+        }
+
+        [Fact]
+        public async Task CreateAsync_IdenticalLines_ShouldBeMerged()
+        {
+            using var db = GetInMemoryDb();
+            var product = await SeedProduct(db, stock: 10);
+            var zone = await SeedDeliveryZone(db);
+            var service = BuildService(db);
 
             var request = new CreateOrderRequest
             {
@@ -520,8 +577,89 @@ namespace AuraNova.UnitTests
                 Delivery = new CreateOrderDeliveryRequest { Type = "Delivery", DeliveryZoneId = zone.Id, DeliveryAddress = "test" }
             };
 
+            var result = await service.CreateAsync(request);
+
+            var line = Assert.Single(result.Items);
+            Assert.Equal(5, line.Quantity);
+        }
+
+        [Fact]
+        public async Task CreateAsync_LegacyCommaSeparatedColors_ShouldBeStoredAsList()
+        {
+            using var db = GetInMemoryDb();
+            var product = await SeedProduct(db);
+            product.AvailableColors = ["Rojo", "Blanco", "Azul"];
+            product.AvailableFlowerTypes = ["Rosas", "Girasoles"];
+            await db.SaveChangesAsync();
+            var zone = await SeedDeliveryZone(db);
+            var service = BuildService(db);
+
+            var request = new CreateOrderRequest
+            {
+                Customer = new CreateOrderCustomerRequest { Name = "María", Phone = "999999999" },
+                Items = [
+                    new()
+                    {
+                        ProductId = product.Id, Quantity = 1,
+                        SelectedPrimaryColor = "Rojo", SelectedSecondaryColor = "Blanco, Azul",
+                        SelectedFlowerType = "Rosas", SelectedFlowerColor = "Girasoles"
+                    }
+                ],
+                Delivery = new CreateOrderDeliveryRequest { Type = "Delivery", DeliveryZoneId = zone.Id, DeliveryAddress = "test" }
+            };
+
+            var result = await service.CreateAsync(request);
+
+            var item = Assert.Single(result.Items);
+            Assert.Equal(["Rojo", "Blanco", "Azul"], item.SelectedColors);
+            Assert.Equal(["Rosas", "Girasoles"], item.SelectedFlowerTypes);
+            Assert.Null(item.SelectedSecondaryColor);
+            Assert.Null(item.SelectedFlowerColor);
+        }
+
+        [Fact]
+        public async Task CreateAsync_ColorNotOfferedByProduct_ShouldBeRejected()
+        {
+            using var db = GetInMemoryDb();
+            var product = await SeedProduct(db);
+            product.AvailableColors = ["Rojo"];
+            await db.SaveChangesAsync();
+            var zone = await SeedDeliveryZone(db);
+            var service = BuildService(db);
+
+            var request = new CreateOrderRequest
+            {
+                Customer = new CreateOrderCustomerRequest { Name = "María", Phone = "999999999" },
+                Items = [new() { ProductId = product.Id, Quantity = 1, SelectedColors = ["Verde"] }],
+                Delivery = new CreateOrderDeliveryRequest { Type = "Delivery", DeliveryZoneId = zone.Id, DeliveryAddress = "test" }
+            };
+
             var ex = await Assert.ThrowsAsync<OrderValidationException>(() => service.CreateAsync(request));
-            Assert.Contains("duplicados", ex.Message);
+            Assert.Contains("Verde", ex.Message);
+        }
+
+        [Fact]
+        public async Task CreateAsync_ExtrasNotAllowedByProduct_ShouldBeIgnored()
+        {
+            using var db = GetInMemoryDb();
+            var product = await SeedProduct(db);
+            product.AllowsLights = true;
+            await db.SaveChangesAsync();
+            var zone = await SeedDeliveryZone(db);
+            var service = BuildService(db);
+
+            var request = new CreateOrderRequest
+            {
+                Customer = new CreateOrderCustomerRequest { Name = "María", Phone = "999999999" },
+                Items = [new() { ProductId = product.Id, Quantity = 1, HasLights = true, HasButterfly = true, HasPhraseCard = true, PhraseText = "Hola" }],
+                Delivery = new CreateOrderDeliveryRequest { Type = "Delivery", DeliveryZoneId = zone.Id, DeliveryAddress = "test" }
+            };
+
+            var item = Assert.Single((await service.CreateAsync(request)).Items);
+            Assert.True(item.HasLights);
+            Assert.False(item.HasButterfly);
+            Assert.False(item.HasPhraseCard);
+            Assert.Null(item.PhraseText);
         }
 
         [Fact]

@@ -87,11 +87,16 @@ namespace AuraNova.Infrastructure.Notifications
 
         public async Task<string> BuildQuoteReadyMessageAsync(Order order)
         {
-            var shippingCost = order.Quote?.ShippingCost ?? 0m;
-            var customCost = order.Quote?.CustomizationCost ?? 0m;
+            var shippingCost = order.DeliveryCost ?? order.Quote?.ShippingCost ?? 0m;
+            var customCost = order.Quote?.CustomizationCost ?? order.CustomizationCost;
             var subtotal = order.Subtotal;
-            var total = subtotal + shippingCost + customCost;
+            // El total guardado en el pedido es el que se cobra
+            var total = order.Total ?? subtotal + shippingCost + customCost;
             var businessName = await GetBusinessNameAsync();
+            var shippingLine = order.DeliveryType == DeliveryType.NationalShipping && shippingCost == 0
+                ? "Envío: se paga en destino"
+                : $"Envío: S/ {shippingCost:F2}";
+            var notes = string.IsNullOrWhiteSpace(order.Quote?.Notes) ? "" : $"\nNota: {order.Quote!.Notes!.Trim()}\n";
 
             if (order.IsCustomOrder)
             {
@@ -101,12 +106,11 @@ namespace AuraNova.Infrastructure.Notifications
                     Tu cotización de {businessName} para tu pedido personalizado ({order.OrderCode}) ya está lista.
                     
                     Costo del detalle: S/ {customCost:F2}
-                    Envío: S/ {shippingCost:F2}
+                    {shippingLine}
                     Total a pagar: S/ {total:F2}
-                    
-                    Pedido: {order.OrderCode}
+                    {notes}
+                    Acéptala y paga desde aquí: {TrackingUrl(order)}
                     Código de seguimiento: {order.TrackingToken}
-                    Síguelo aquí: {TrackingUrl(order)}
                     
                     Gracias por elegir {businessName}
                     """.Replace("                    ", "");
@@ -118,12 +122,11 @@ namespace AuraNova.Infrastructure.Notifications
                 Tu cotización de {businessName} para el pedido {order.OrderCode} ya está lista.
                 
                 Productos: S/ {subtotal:F2}
-                Envío: S/ {shippingCost:F2}
+                {shippingLine}
                 Total: S/ {total:F2}
-                
-                Pedido: {order.OrderCode}
+                {notes}
+                Acéptala y paga desde aquí: {TrackingUrl(order)}
                 Código de seguimiento: {order.TrackingToken}
-                Síguelo aquí: {TrackingUrl(order)}
                 
                 Gracias por elegir {businessName}
                 """.Replace("                ", "");

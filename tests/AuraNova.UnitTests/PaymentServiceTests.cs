@@ -112,6 +112,24 @@ namespace AuraNova.UnitTests
         }
 
         [Fact]
+        public async Task ReportEvidenceAsync_WaitingPaymentWithoutPayment_ShouldCreateItFromTotal()
+        {
+            using var db = GetInMemoryDb(Guid.NewGuid().ToString());
+            var order = new Order { OrderCode = "AN-1001", Status = OrderStatus.WaitingPayment, Total = 120m };
+            db.Orders.Add(order);
+            await db.SaveChangesAsync();
+            var service = CreateService(db);
+
+            using var stream = new MemoryStream(Encoding.UTF8.GetBytes("fake image content"));
+            var result = await service.ReportEvidenceAsync(order.Id, stream, "evidence.jpg", "image/jpeg");
+
+            Assert.Equal("Reported", result.Status);
+            var payment = await db.Payments.SingleAsync(p => p.OrderId == order.Id);
+            Assert.Equal(120m, payment.Amount);
+            Assert.Equal(OrderStatus.PaymentReported, (await db.Orders.FindAsync(order.Id))!.Status);
+        }
+
+        [Fact]
         public async Task ReportEvidenceAsync_ShouldRejectInvalidExtension()
         {
             using var db = GetInMemoryDb(Guid.NewGuid().ToString());
@@ -134,12 +152,12 @@ namespace AuraNova.UnitTests
             var service = CreateService(db);
 
             // Create a fake stream that reports a large length but doesn't actually allocate memory
-            var stream = new MockLargeStream(6 * 1024 * 1024); // 6MB
+            var stream = new MockLargeStream(11 * 1024 * 1024); // 11MB
 
             var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
                 service.ReportEvidenceAsync(order.Id, stream, "large.jpg", "image/jpeg"));
 
-            Assert.Contains("menor a 5 MB", ex.Message);
+            Assert.Contains("menor a 10 MB", ex.Message);
         }
 
         [Fact]

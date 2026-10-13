@@ -1,6 +1,8 @@
 using System.Threading.Tasks;
 using AuraNova.Application.BusinessSettings.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
+using AuraNova.API.Configuration;
 
 namespace AuraNova.API.Controllers
 {
@@ -13,6 +15,14 @@ namespace AuraNova.API.Controllers
         public BusinessSettingsController(IBusinessSettingsService service)
         {
             _service = service;
+        }
+
+        /// <summary>Paleta de colores (con su código para dibujar la muestra) y tipos de flor.</summary>
+        [HttpGet("/api/customization-options")]
+        [OutputCache(PolicyName = CatalogCache.Policy)]
+        public async Task<IActionResult> GetCustomizationOptions()
+        {
+            return Ok(await _service.GetCustomizationOptionsAsync());
         }
 
         [HttpGet]

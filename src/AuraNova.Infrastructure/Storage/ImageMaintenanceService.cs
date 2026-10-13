@@ -22,10 +22,12 @@ namespace AuraNova.Infrastructure.Storage
             var report = new ImageMaintenanceReport { DryRun = dryRun };
 
             // Rutas en uso, normalizadas por si algún producto guardó la URL pública completa
+            // (portadas y fotos de la galería)
             var inUse = (await db.Products
                     .Where(p => p.ImageUrl != null && p.ImageUrl != "")
                     .Select(p => p.ImageUrl!)
                     .ToListAsync(cancellationToken))
+                .Concat(await db.ProductImages.Select(i => i.Path).ToListAsync(cancellationToken))
                 .Select(url => urlResolver.ToStoragePath(url)!.TrimStart('/'))
                 .ToHashSet(StringComparer.Ordinal);
 
@@ -60,6 +62,13 @@ namespace AuraNova.Infrastructure.Storage
             return report;
         }
 
+        /// <summary>La portada también vive en la galería: se actualiza la misma ruta ahí.</summary>
+        private async Task RenameGalleryPathAsync(string oldPath, string newPath, CancellationToken cancellationToken)
+        {
+            foreach (var image in await db.ProductImages.Where(i => i.Path == oldPath).ToListAsync(cancellationToken))
+                image.Path = newPath;
+        }
+
         public async Task<ImageMaintenanceReport> OptimizeProductImagesAsync(bool dryRun, bool deleteOriginals, CancellationToken cancellationToken = default)
         {
             var report = new ImageMaintenanceReport { DryRun = dryRun };
@@ -84,7 +93,11 @@ namespace AuraNova.Infrastructure.Storage
 
                 if (converted.TryGetValue(oldPath, out var alreadyConverted))
                 {
-                    if (!dryRun) product.ImageUrl = alreadyConverted;
+                    if (!dryRun)
+                    {
+                        product.ImageUrl = alreadyConverted;
+                        await RenameGalleryPathAsync(oldPath, alreadyConverted, cancellationToken);
+                    }
                     item.NewPath = alreadyConverted;
                     report.Processed++;
                     report.Items.Add(item);
@@ -111,6 +124,7 @@ namespace AuraNova.Infrastructure.Storage
                         var newPath = await rawStorage.UploadAsync(optimized.Content, $"image{optimized.Extension}", optimized.ContentType, "products");
                         product.ImageUrl = newPath;
                         product.UpdatedAt = DateTimeOffset.UtcNow;
+                        await RenameGalleryPathAsync(oldPath, newPath, cancellationToken);
                         await db.SaveChangesAsync(cancellationToken);
 
                         converted[oldPath] = newPath;

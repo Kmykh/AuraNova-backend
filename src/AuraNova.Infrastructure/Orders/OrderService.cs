@@ -31,16 +31,14 @@ namespace AuraNova.Infrastructure.Orders
             if (request.Items == null || request.Items.Count == 0)
                 throw new OrderValidationException("El pedido debe contener al menos un producto.");
 
-            // --- 2. Reject duplicate ProductIds ---
-            var duplicateIds = request.Items
-                .GroupBy(i => i.ProductId)
-                .Where(g => g.Count() > 1)
-                .Select(g => g.Key)
-                .ToList();
+            if (request.Items.Count > 30)
+                throw new OrderValidationException("Un pedido puede tener hasta 30 productos. Para más unidades escríbenos por WhatsApp.");
 
-            if (duplicateIds.Count > 0)
-                throw new OrderValidationException(
-                    $"El pedido contiene productos duplicados: {string.Join(", ", duplicateIds)}. Envíe cada producto una sola vez con la cantidad total.");
+            // --- 2. El mismo producto puede venir varias veces con distinta personalización:
+            //        stock y disponibilidad se validan con la cantidad total por producto ---
+            var quantityByProduct = request.Items
+                .GroupBy(i => i.ProductId)
+                .ToDictionary(g => g.Key, g => g.Sum(i => Math.Max(i.Quantity, 0)));
 
             // --- 3. Validate each item quantity ---
             foreach (var item in request.Items)
@@ -51,7 +49,7 @@ namespace AuraNova.Infrastructure.Orders
             }
 
             // --- 4. Lookup products from DB ---
-            var productIds = request.Items.Select(i => i.ProductId).ToList();
+            var productIds = quantityByProduct.Keys.ToList();
             var products = await _db.Products
                 .Where(p => productIds.Contains(p.Id))
                 .ToListAsync();
@@ -64,18 +62,26 @@ namespace AuraNova.Infrastructure.Orders
                     $"Productos no encontrados: {string.Join(", ", missingIds)}.");
 
             // --- 6. Validate availability and stock ---
-            foreach (var item in request.Items)
+            foreach (var (productId, quantity) in quantityByProduct)
             {
-                var product = products.First(p => p.Id == item.ProductId);
+                var product = products.First(p => p.Id == productId);
 
                 if (!product.IsAvailable)
                     throw new OrderValidationException(
                         $"El producto '{product.Name}' no está disponible actualmente.");
 
-                if (product.Stock < item.Quantity)
+                if (product.Stock < quantity)
                     throw new OrderValidationException(
-                        $"Stock insuficiente para '{product.Name}'. Disponible: {product.Stock}, solicitado: {item.Quantity}.");
+                        $"Stock insuficiente para '{product.Name}'. Disponible: {product.Stock}, solicitado: {quantity}.");
             }
+
+            // --- 6b. Opciones elegidas, validadas contra lo que ofrece cada producto.
+            //         Las líneas con la misma personalización se juntan en una sola ---
+            var lines = request.Items
+                .Select(item => (Item: item, Options: OrderItemOptions.Resolve(item, products.First(p => p.Id == item.ProductId))))
+                .GroupBy(l => (l.Item.ProductId, l.Options.Key))
+                .Select(g => (ProductId: g.Key.ProductId, Quantity: g.Sum(l => l.Item.Quantity), Options: g.First().Options))
+                .ToList();
 
             // --- 7. Validate delivery info ---
             if (request.Delivery == null)
@@ -163,11 +169,11 @@ namespace AuraNova.Infrastructure.Orders
             try
             {
                 // Reserve stock atomically inside the transaction (rolled back if anything below fails)
-                foreach (var item in request.Items)
+                foreach (var (productId, quantity) in quantityByProduct)
                 {
-                    if (!await ProductStock.TryReserveAsync(_db, item.ProductId, item.Quantity))
+                    if (!await ProductStock.TryReserveAsync(_db, productId, quantity))
                     {
-                        var productName = products.First(p => p.Id == item.ProductId).Name;
+                        var productName = products.First(p => p.Id == productId).Name;
                         throw new OrderValidationException(
                             $"Stock insuficiente para '{productName}'. Otro cliente acaba de comprar las últimas unidades.");
                     }
@@ -189,29 +195,31 @@ namespace AuraNova.Infrastructure.Orders
                 var orderItems = new List<OrderItem>();
                 decimal orderSubtotal = 0;
 
-                foreach (var item in request.Items)
+                foreach (var line in lines)
                 {
-                    var product = products.First(p => p.Id == item.ProductId);
-                    
+                    var product = products.First(p => p.Id == line.ProductId);
+                    var options = line.Options;
+
                     // Resolve campaign price
                     var priceResult = await _priceResolver.ResolvePriceAsync(product.Id);
-                    var itemSubtotal = priceResult.EffectivePrice * item.Quantity;
+                    var itemSubtotal = priceResult.EffectivePrice * line.Quantity;
 
                     var orderItem = new OrderItem
                     {
                         ProductId = product.Id,
-                        Quantity = item.Quantity,
+                        Quantity = line.Quantity,
                         UnitPrice = priceResult.EffectivePrice, // Historical price snapshot (from campaign or base)
                         Subtotal = itemSubtotal,
-                        SelectedPrimaryColor = item.SelectedPrimaryColor,
-                        SelectedSecondaryColor = item.SelectedSecondaryColor,
-                        SelectedFlowerType = item.SelectedFlowerType,
-                        SelectedFlowerColor = item.SelectedFlowerColor,
-                        HasLights = item.HasLights,
-                        HasButterfly = item.HasButterfly,
-                        HasPhraseCard = item.HasPhraseCard,
-                        PhraseText = item.PhraseText,
-                        PhraseFont = item.PhraseFont,
+                        SelectedColors = options.Colors,
+                        SelectedFlowerTypes = options.FlowerTypes,
+                        // Campos anteriores: solo la primera opción, sin listas en texto
+                        SelectedPrimaryColor = options.Colors.FirstOrDefault(),
+                        SelectedFlowerType = options.FlowerTypes.FirstOrDefault(),
+                        HasLights = options.HasLights,
+                        HasButterfly = options.HasButterfly,
+                        HasPhraseCard = options.HasPhraseCard,
+                        PhraseText = options.PhraseText,
+                        PhraseFont = options.PhraseFont,
                         
                         // Campaign tracking context
                         CampaignId = priceResult.CampaignId,
@@ -308,6 +316,8 @@ namespace AuraNova.Infrastructure.Orders
                                 Quantity = oi.Quantity,
                                 UnitPrice = oi.UnitPrice,
                                 Subtotal = oi.Subtotal,
+                                SelectedColors = oi.SelectedColors,
+                                SelectedFlowerTypes = oi.SelectedFlowerTypes,
                                 SelectedPrimaryColor = oi.SelectedPrimaryColor,
                                 SelectedSecondaryColor = oi.SelectedSecondaryColor,
                                 SelectedFlowerType = oi.SelectedFlowerType,
@@ -416,6 +426,8 @@ namespace AuraNova.Infrastructure.Orders
                         if (deliveryZone == null)
                             throw new OrderNotFoundException(
                                 $"Zona de delivery con Id '{request.Delivery.DeliveryZoneId}' no encontrada.");
+                        if (!deliveryZone.IsActive)
+                            throw new OrderValidationException($"La zona de delivery '{deliveryZone.Name}' no está activa.");
                         deliveryCost = deliveryZone.Cost;
                         deliveryZoneName = deliveryZone.Name;
                         break;
@@ -427,6 +439,8 @@ namespace AuraNova.Infrastructure.Orders
                         if (meetingPoint == null)
                             throw new OrderNotFoundException(
                                 $"Punto de encuentro con Id '{request.Delivery.MeetingPointId}' no encontrado.");
+                        if (!meetingPoint.IsActive)
+                            throw new OrderValidationException($"El punto de encuentro '{meetingPoint.Name}' no está activo.");
                         deliveryCost = meetingPoint.Cost;
                         meetingPointName = meetingPoint.Name;
                         break;

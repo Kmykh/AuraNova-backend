@@ -145,5 +145,35 @@ namespace AuraNova.UnitTests
             Assert.Equal("Preparing", history[1].Status);
             Assert.Equal("Ready", history[2].Status);
         }
+
+        [Fact]
+        public async Task ChangeStatusAsync_ToQuoteReadyWithoutPrice_ShouldBeRejected()
+        {
+            using var db = GetInMemoryDb();
+            var order = await SeedOrder(db, OrderStatus.WaitingQuote);
+            order.Total = null;
+            await db.SaveChangesAsync();
+            var service = new OrderStatusService(db, new OrderStatusTransitionService(), new Mock<INotificationService>().Object,
+                new Mock<ICurrentUserService>().Object, new NullLogger<OrderStatusService>());
+
+            var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
+                service.ChangeStatusAsync(order.Id, OrderStatus.QuoteReady, null));
+            Assert.Contains("Enviar cotización", ex.Message);
+        }
+
+        [Fact]
+        public async Task ChangeStatusAsync_AcceptQuoteFromPanel_ShouldCreatePendingPayment()
+        {
+            using var db = GetInMemoryDb();
+            var order = await SeedOrder(db, OrderStatus.QuoteReady);
+            var service = new OrderStatusService(db, new OrderStatusTransitionService(), new Mock<INotificationService>().Object,
+                new Mock<ICurrentUserService>().Object, new NullLogger<OrderStatusService>());
+
+            await service.ChangeStatusAsync(order.Id, OrderStatus.WaitingPayment, "Aceptó por WhatsApp");
+
+            var payment = await db.Payments.SingleAsync(p => p.OrderId == order.Id);
+            Assert.Equal(87m, payment.Amount);
+            Assert.Equal(PaymentStatus.Pending, payment.Status);
+        }
     }
 }

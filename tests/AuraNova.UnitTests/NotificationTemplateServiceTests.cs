@@ -66,6 +66,9 @@ namespace AuraNova.UnitTests
             
             var order = BuildOrder(DeliveryType.NationalShipping);
             order.Subtotal = 150.50m;
+            order.DeliveryCost = 20.00m;
+            // QuoteService guarda el total en el pedido: es el que se cobra
+            order.Total = 170.50m;
             order.Quote = new Quote
             {
                 ShippingCost = 20.00m

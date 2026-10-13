@@ -11,6 +11,11 @@ namespace AuraNova.Application.Products.DTOs
         public string? Description { get; set; }
         public decimal Price { get; set; }
         public string? ImageUrl { get; set; }
+        /// <summary>
+        /// Galería completa en orden (la primera es la portada). Si se envía, reemplaza a <see cref="ImageUrl"/>;
+        /// si es null se mantiene el comportamiento anterior de una sola imagen.
+        /// </summary>
+        public List<string>? ImageUrls { get; set; }
 
         public Guid? CategoryId { get; set; }
         public ProductAudience? Audience { get; set; }

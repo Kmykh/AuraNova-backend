@@ -25,12 +25,30 @@ namespace AuraNova.API.Controllers
         private readonly IOrderService _orderService;
         private readonly IReferenceImageService _referenceImages;
         private readonly IFileStorageService _storage;
+        private readonly IOrderTrackingService _tracking;
 
-        public OrdersController(IOrderService orderService, IReferenceImageService referenceImages, IFileStorageService storage)
+        public OrdersController(IOrderService orderService, IReferenceImageService referenceImages, IFileStorageService storage, IOrderTrackingService tracking)
         {
             _orderService = orderService;
             _referenceImages = referenceImages;
             _storage = storage;
+            _tracking = tracking;
+        }
+
+        /// <summary>
+        /// Resumen para la página de pago: estado, montos de la cotización y productos, siempre actualizados.
+        /// El Id (GUID aleatorio) solo lo conocen el cliente y el panel; no expone datos personales.
+        /// </summary>
+        [HttpGet("{id:guid}/summary")]
+        [EnableRateLimiting("tracking_policy")]
+        public async Task<IActionResult> GetSummary(Guid id)
+        {
+            var summary = await _tracking.GetPaymentSummaryAsync(id);
+            if (summary == null)
+                return NotFound(new { message = "No encontramos este pedido." });
+
+            Response.Headers.CacheControl = "no-store";
+            return Ok(summary);
         }
 
         /// <summary>

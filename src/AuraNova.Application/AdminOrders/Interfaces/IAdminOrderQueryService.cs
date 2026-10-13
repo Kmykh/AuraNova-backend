@@ -9,5 +9,6 @@ namespace AuraNova.Application.AdminOrders.Interfaces
     {
         Task<PagedResponse<AdminOrderListItemResponse>> GetOrdersAsync(AdminOrderFilterRequest request);
         Task<AdminOrderDetailResponse?> GetOrderDetailAsync(Guid id);
+        Task<AdminOrderCountsResponse> GetCountsAsync();
     }
 }
