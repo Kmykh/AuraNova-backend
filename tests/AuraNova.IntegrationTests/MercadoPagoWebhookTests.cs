@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using AuraNova.Domain.Entities;
@@ -160,6 +161,18 @@ namespace AuraNova.IntegrationTests
             Assert.Equal(OrderStatus.WaitingPayment, order.Status);
             Assert.Equal(0m, payment.AmountPaid);
             Assert.Equal(["invalid_signature"], await WebhookResults(factory));
+        }
+
+        [Fact]
+        public async Task Config_ReturnsThePublicKey_FromTheBackendSettings()
+        {
+            var (factory, _, _) = Setup();
+            using var withKey = factory.WithWebHostBuilder(b => b.UseSetting("MercadoPago:PublicKey", "APP_USR-test-public"));
+            using var client = withKey.CreateClient();
+
+            var json = await client.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/payments/mercadopago/config");
+
+            Assert.Equal("APP_USR-test-public", json.GetProperty("publicKey").GetString());
         }
 
         [Fact]

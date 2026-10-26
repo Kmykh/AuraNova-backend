@@ -11,10 +11,12 @@ El cliente elige pagar el **50 % de adelanto** o el **total**; el saldo se paga 
 | Backend (Render) | `MercadoPago__AccessToken` | Access Token de la aplicación (prueba o producción). **Nunca** en el frontend ni en git. |
 | Backend (Render) | `MercadoPago__WebhookSecret` | Clave secreta de *Webhooks → Configurar notificaciones*. |
 | Backend (Render) | `MercadoPago__StatementDescriptor` | Opcional. Nombre en el estado de cuenta de la tarjeta (por defecto `AURANOVA`). |
-| Frontend (Vercel) | `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY` | Public Key de la misma aplicación. Requiere volver a desplegar. |
+| Backend (Render) | `MercadoPago__PublicKey` | Public Key de la misma aplicación (no es secreta). La web la pide al backend: así las dos claves viven juntas. |
+| Frontend (Vercel) | `NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY` | Opcional. Si existe, tiene prioridad; requiere volver a desplegar en Vercel. |
 
 Las credenciales de prueba y las de producción empiezan con `APP_USR-`. Se usan las de **prueba** hasta terminar las pruebas,
-y se cambian **las dos** (Public Key y Access Token) a las de producción al salir en vivo.
+y se cambian **las dos** (Public Key y Access Token) a las de producción al salir en vivo. Si la Public Key no está
+en ningún lado, la página de pago muestra "Los pagos en línea se están activando" y solo ofrece WhatsApp.
 
 ## 2. Webhooks (notificaciones)
 

@@ -19,6 +19,15 @@ namespace AuraNova.API.Controllers
         /// Cobra el adelanto del 50%, el total o el saldo del pedido. El monto lo calcula el servidor;
         /// el navegador solo envía el token de un solo uso generado por MercadoPago.js.
         /// </summary>
+        /// <summary>Public Key de Mercado Pago para MercadoPago.js (no es secreta). Null si no está configurada.</summary>
+        [HttpGet("api/payments/mercadopago/config")]
+        public IActionResult Config()
+        {
+            var publicKey = settings.Value.PublicKey?.Trim();
+            Response.Headers.CacheControl = "public, max-age=300";
+            return Ok(new { publicKey = string.IsNullOrEmpty(publicKey) ? null : publicKey });
+        }
+
         [HttpPost("api/orders/{orderId:guid}/payments/mercadopago")]
         [EnableRateLimiting("online_payment_policy")]
         public async Task<IActionResult> Pay(Guid orderId, [FromBody] CreateOnlinePaymentRequest request, CancellationToken cancellationToken)
