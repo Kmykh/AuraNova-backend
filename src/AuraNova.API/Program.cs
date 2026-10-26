@@ -189,6 +189,7 @@ builder.Services.AddScoped<AuraNova.Application.Notifications.Interfaces.INotifi
 
 // Correos automáticos (sección "Email"): Resend por HTTPS si hay ApiKey, si no SMTP; sin configuración quedan desactivados
 builder.Services.Configure<AuraNova.Infrastructure.Notifications.Email.EmailSettings>(builder.Configuration.GetSection("Email"));
+builder.Services.PostConfigure<AuraNova.Infrastructure.Notifications.Email.EmailSettings>(settings => settings.Normalize());
 builder.Services.AddSingleton<AuraNova.Infrastructure.Notifications.Email.IEmailQueue, AuraNova.Infrastructure.Notifications.Email.EmailQueue>();
 builder.Services.AddHttpClient<AuraNova.Infrastructure.Notifications.Email.ResendEmailSender>(client =>
 {

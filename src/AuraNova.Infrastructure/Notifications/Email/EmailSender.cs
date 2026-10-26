@@ -22,6 +22,10 @@ namespace AuraNova.Infrastructure.Notifications.Email
 
         public async Task SendAsync(string to, string subject, string html, string plainText, string? idempotencyKey = null, CancellationToken cancellationToken = default)
         {
+            // Una key mal pegada haría fallar el encabezado con un error que incluye la key: se avisa sin mostrarla
+            if (!_settings.ApiKeyLooksValid)
+                throw new EmailSendException("La API key de Resend no es válida: debe empezar con \"re_\" y no tener espacios (revisa Email__ApiKey en Render).");
+
             var body = new Dictionary<string, object>
             {
                 ["from"] = $"{_settings.FromName} <{_settings.FromAddress}>",

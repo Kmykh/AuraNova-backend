@@ -2,7 +2,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using AuraNova.API.Configuration;
+using AuraNova.Domain.Entities;
+using AuraNova.Domain.Enums;
 using AuraNova.Infrastructure.Notifications.Email;
+using AuraNova.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace AuraNova.API.Controllers
 {
@@ -17,9 +21,61 @@ namespace AuraNova.API.Controllers
     public class DiagnosticsAdminController(
         IOptions<SecuritySettings> securityOptions,
         IOptions<EmailSettings> emailOptions,
-        IServiceProvider services) : ControllerBase
+        IServiceProvider services,
+        AppDbContext db,
+        IConfiguration configuration) : ControllerBase
     {
         public record EmailTestRequest(string To);
+
+        /// <summary>
+        /// Estado de los correos para el panel: si están configurados, con qué remitente y los últimos envíos
+        /// con su error. Nunca devuelve la API key.
+        /// </summary>
+        [HttpGet("email")]
+        public async Task<IActionResult> GetEmailStatus(CancellationToken cancellationToken)
+        {
+            var settings = emailOptions.Value;
+            var notificationsDisabled = bool.TryParse(configuration["NotificationSettings:Enabled"], out var enabled) && !enabled;
+
+            string? problem = null;
+            if (notificationsDisabled)
+                problem = "Las notificaciones están desactivadas (NotificationSettings__Enabled=false en Render).";
+            else if (settings.UsesResend && !settings.ApiKeyLooksValid)
+                problem = "La API key de Resend no es válida: debe empezar con \"re_\" (revisa Email__ApiKey en Render).";
+            else if (!settings.IsConfigured)
+                problem = settings.UsesResend
+                    ? "Falta Email__FromAddress en Render."
+                    : "Los correos no están configurados: agrega Email__ApiKey (Resend) y Email__FromAddress en Render.";
+
+            var recent = await db.Set<Notification>()
+                .AsNoTracking()
+                .Where(n => n.Channel == NotificationChannel.Email)
+                .OrderByDescending(n => n.CreatedAt)
+                .Take(10)
+                .Select(n => new
+                {
+                    n.Id,
+                    OrderCode = n.Order != null ? n.Order.OrderCode : null,
+                    n.Type,
+                    n.Status,
+                    n.Recipient,
+                    n.ErrorMessage,
+                    n.CreatedAt,
+                    n.SentAt
+                })
+                .ToListAsync(cancellationToken);
+
+            return Ok(new
+            {
+                configured = problem == null,
+                provider = settings.ProviderName,
+                fromAddress = string.IsNullOrWhiteSpace(settings.FromAddress) ? null : settings.FromAddress,
+                fromName = settings.FromName,
+                replyTo = string.IsNullOrWhiteSpace(settings.ReplyTo) ? null : settings.ReplyTo,
+                problem,
+                recent
+            });
+        }
 
         /// <summary>
         /// Envía un correo de prueba y devuelve el resultado exacto (o el motivo del error),

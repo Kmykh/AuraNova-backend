@@ -36,5 +36,24 @@ namespace AuraNova.Infrastructure.Notifications.Email
             : !string.IsNullOrWhiteSpace(Host) && !string.IsNullOrWhiteSpace(Username) && !string.IsNullOrWhiteSpace(Password);
 
         public string ProviderName => UsesResend ? "Resend" : "SMTP";
+
+        /// <summary>Las API keys de Resend empiezan con "re_" y no tienen espacios.</summary>
+        public bool ApiKeyLooksValid => ApiKey.StartsWith("re_", StringComparison.Ordinal) && !ApiKey.Any(char.IsWhiteSpace);
+
+        /// <summary>
+        /// Quita espacios, saltos de línea y comillas que suelen colarse al pegar los valores en Render
+        /// (una key con un espacio al final rompe el encabezado y el correo ni llega a Resend).
+        /// </summary>
+        public void Normalize()
+        {
+            static string Clean(string value) => value.Trim().Trim('"', '\'').Trim();
+            Provider = Clean(Provider);
+            ApiKey = Clean(ApiKey);
+            Host = Clean(Host);
+            Username = Clean(Username);
+            FromAddress = Clean(FromAddress);
+            FromName = Clean(FromName);
+            ReplyTo = Clean(ReplyTo);
+        }
     }
 }
