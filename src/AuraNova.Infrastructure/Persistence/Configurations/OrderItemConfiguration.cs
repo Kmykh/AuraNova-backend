@@ -29,6 +29,10 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
             builder.Property(oi => oi.SelectedFlowerColor).HasMaxLength(50);
             builder.Property(oi => oi.PhraseText).HasMaxLength(1000);
             builder.Property(oi => oi.PhraseFont).HasMaxLength(50);
+            builder.Property(oi => oi.PhraseTo).HasMaxLength(60);
+            builder.Property(oi => oi.PhraseFrom).HasMaxLength(60);
+            builder.Property(oi => oi.PhraseTheme).HasMaxLength(20);
+            builder.Property(oi => oi.CardBackgroundPath).HasMaxLength(300);
 
             // Opciones elegidas como lista JSON: una por elemento
             var stringListComparer = new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<string>>(

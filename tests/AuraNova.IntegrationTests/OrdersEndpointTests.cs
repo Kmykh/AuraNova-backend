@@ -159,7 +159,7 @@ namespace AuraNova.IntegrationTests
         // =====================================================================
 
         [Fact]
-        public async Task POST_Orders_NationalShipping_ShouldReturn201WithNullCosts()
+        public async Task POST_Orders_NationalShipping_ChargesProductsNow_AndShippingAtTheAgency()
         {
             await using var factory = CreateFactory("it_ns_" + Guid.NewGuid());
             var client = factory.CreateClient();
@@ -167,35 +167,32 @@ namespace AuraNova.IntegrationTests
 
             var request = new CreateOrderRequest
             {
-                Customer = new CreateOrderCustomerRequest { Name = "Ana", Phone = "777777777" },
+                Customer = new CreateOrderCustomerRequest { Name = "Ana", Phone = "977777777" },
                 Items = [new() { ProductId = product.Id, Quantity = 1 }],
                 Delivery = new CreateOrderDeliveryRequest
                 {
                     Type = "NationalShipping",
                     Department = "Lima",
                     Province = "Lima",
-                    District = "Miraflores",
-                    DeliveryAddress = "Av. Larco 400"
+                    District = "Carabayllo",
+                    PreferredAgency = "Shalom",
+                    RecipientDocument = "12345678"
                 }
             };
 
             var response = await client.PostAsJsonAsync("/api/orders", request);
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
+            // Regla del negocio: se cobran los productos (50% o total) y el envío lo paga el cliente al recoger
             var json = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal("NationalShipping", json.GetProperty("deliveryType").GetString());
-            Assert.Equal("WaitingQuote", json.GetProperty("status").GetString());
-
-            // DeliveryCost and Total should be null
+            Assert.Equal("WaitingPayment", json.GetProperty("status").GetString());
             Assert.Equal(JsonValueKind.Null, json.GetProperty("deliveryCost").ValueKind);
-            Assert.Equal(JsonValueKind.Null, json.GetProperty("total").ValueKind);
+            Assert.Equal(79.90m, json.GetProperty("total").GetDecimal());
 
-            // Verify Quote was created in DB
             using var scope = factory.Services.CreateScope();
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var quote = await db.Quotes.FirstOrDefaultAsync();
-            Assert.NotNull(quote);
-            Assert.Equal(AuraNova.Domain.Enums.QuoteStatus.Pending, quote.Status);
+            var order = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Orders.SingleAsync();
+            Assert.Equal(("Carabayllo", "Shalom", "12345678"), (order.District, order.PreferredAgency, order.RecipientDocument));
         }
 
         // =====================================================================

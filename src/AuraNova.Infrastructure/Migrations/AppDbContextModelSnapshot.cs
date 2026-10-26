@@ -697,6 +697,10 @@ namespace AuraNova.Infrastructure.Migrations
                     b.Property<Guid?>("CampaignStageId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CardBackgroundPath")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
                     b.Property<bool>("HasButterfly")
                         .HasColumnType("boolean");
 
@@ -713,9 +717,21 @@ namespace AuraNova.Infrastructure.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("PhraseFrom")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
                     b.Property<string>("PhraseText")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("PhraseTheme")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("PhraseTo")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
 
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");

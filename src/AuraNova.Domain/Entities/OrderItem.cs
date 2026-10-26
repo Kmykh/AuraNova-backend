@@ -30,6 +30,14 @@ namespace AuraNova.Domain.Entities
         public bool HasPhraseCard { get; set; } = false;
         public string? PhraseText { get; set; }
         public string? PhraseFont { get; set; }
+        /// <summary>Tarjeta: para quién es (se imprime "Para: …").</summary>
+        public string? PhraseTo { get; set; }
+        /// <summary>Tarjeta: quién la envía (se imprime la firma).</summary>
+        public string? PhraseFrom { get; set; }
+        /// <summary>Diseño de la tarjeta: marfil, rosa, pergamino, noir, salvia o foto.</summary>
+        public string? PhraseTheme { get; set; }
+        /// <summary>Foto que subió el cliente como fondo de la tarjeta (bucket privado, "private/…").</summary>
+        public string? CardBackgroundPath { get; set; }
 
         // Campaign Tracking
         public Guid? CampaignId { get; set; }
