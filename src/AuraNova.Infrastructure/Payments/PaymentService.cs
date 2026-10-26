@@ -180,6 +180,7 @@ namespace AuraNova.Infrastructure.Payments
                 throw new OrderValidationException("El pago debe tener evidencia reportada para ser confirmado.");
 
             payment.Status = PaymentStatus.Confirmed;
+            payment.AmountPaid = payment.Amount;
             payment.VerifiedAt = DateTimeOffset.UtcNow;
             payment.UpdatedAt = DateTimeOffset.UtcNow;
 

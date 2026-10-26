@@ -82,7 +82,7 @@ namespace AuraNova.API.Controllers
             }
             catch (OrderValidationException ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "No se pudo actualizar el pedido");
             }
         }
 
@@ -116,7 +116,7 @@ namespace AuraNova.API.Controllers
             }
             catch (OrderValidationException ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "No se pudo actualizar el pedido");
             }
         }
 
@@ -153,7 +153,7 @@ namespace AuraNova.API.Controllers
             }
             catch (OrderValidationException ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "No se pudo actualizar el pedido");
             }
         }
 
@@ -183,11 +183,11 @@ namespace AuraNova.API.Controllers
             }
             catch (OrderValidationException ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "No se pudo actualizar el pedido");
             }
             catch (InvalidImageException ex)
             {
-                return BadRequest(new { message = ex.Message });
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "No se pudo actualizar el pedido");
             }
         }
     }

@@ -96,6 +96,9 @@ namespace AuraNova.Infrastructure.Orders
                     MeetingPointName = o.MeetingPoint != null ? o.MeetingPoint.Name : null,
                     o.District,
                     PaymentStatus = o.Payment != null ? (PaymentStatus?)o.Payment.Status : null,
+                    BalanceDue = o.Payment != null && o.Payment.AmountPaid > 0 && o.Payment.AmountPaid < o.Payment.Amount
+                        ? (decimal?)(o.Payment.Amount - o.Payment.AmountPaid)
+                        : null,
                     ReferenceImageCount = o.ReferenceImages!.Count(),
                     Items = o.Items!
                         .Select(i => new
@@ -137,6 +140,7 @@ namespace AuraNova.Infrastructure.Orders
                         _ => o.District
                     },
                     PaymentStatus = o.PaymentStatus?.ToString(),
+                    BalanceDue = o.BalanceDue,
                     ReferenceImageCount = o.ReferenceImageCount,
                     ItemCount = o.Items.Sum(i => i.Quantity),
                     Items = o.Items.Select(i => new AdminOrderListProduct
@@ -187,7 +191,7 @@ namespace AuraNova.Infrastructure.Orders
                 .Include(o => o.DeliveryZone)
                 .Include(o => o.MeetingPoint)
                 .Include(o => o.Quote)
-                .Include(o => o.Payment)
+                .Include(o => o.Payment!).ThenInclude(p => p.Transactions)
                 .Include(o => o.StatusHistory)
                 .Include(o => o.Notifications)
                 .Include(o => o.ReferenceImages)
@@ -304,9 +308,26 @@ namespace AuraNova.Infrastructure.Orders
                     PaymentStatus = order.Payment.Status.ToString(),
                     PaymentMethod = order.Payment.Method.ToString(),
                     Amount = order.Payment.Amount,
+                    AmountPaid = order.Payment.AmountPaid,
+                    BalanceDue = Math.Max(0, order.Payment.Amount - order.Payment.AmountPaid),
                     EvidenceUrl = FileUrl(order.Payment.EvidenceUrl),
                     CreatedAt = order.Payment.CreatedAt,
-                    VerifiedAt = order.Payment.VerifiedAt
+                    VerifiedAt = order.Payment.VerifiedAt,
+                    Transactions = (order.Payment.Transactions ?? [])
+                        .Where(t => t.Status != "created")
+                        .OrderByDescending(t => t.CreatedAt)
+                        .Select(t => new AdminPaymentTransaction
+                        {
+                            MethodId = t.MethodId,
+                            MethodType = t.MethodType,
+                            Amount = t.Amount,
+                            IsDeposit = t.IsDeposit,
+                            Status = t.Status,
+                            StatusDetail = t.StatusDetail,
+                            Approved = t.ApprovedAt != null,
+                            ExternalOrderId = t.ExternalOrderId,
+                            CreatedAt = t.CreatedAt
+                        }).ToList()
                 };
             }
 

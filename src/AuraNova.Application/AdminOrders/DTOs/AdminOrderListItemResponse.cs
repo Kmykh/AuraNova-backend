@@ -27,6 +27,8 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public List<AdminOrderListProduct> Items { get; set; } = new List<AdminOrderListProduct>();
         public int ReferenceImageCount { get; set; }
         public string? PaymentStatus { get; set; }
+        /// <summary>Saldo por cobrar cuando el cliente pagó solo el adelanto.</summary>
+        public decimal? BalanceDue { get; set; }
         public DateOnly? DesiredDate { get; set; }
         public string? Occasion { get; set; }
         public string? DeliveryPlace { get; set; }

@@ -43,6 +43,9 @@ namespace AuraNova.Application.Orders.DTOs
         public decimal? DeliveryCost { get; set; }
         public decimal CustomizationCost { get; set; }
         public decimal? Total { get; set; }
+        /// <summary>Lo pagado con Mercado Pago y lo que falta (con el adelanto del 50%).</summary>
+        public decimal AmountPaid { get; set; }
+        public decimal BalanceDue { get; set; }
     }
 
     public class PublicTrackingEstimates

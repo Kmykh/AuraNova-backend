@@ -82,6 +82,11 @@ namespace AuraNova.Infrastructure.Orders
                 QuotedAt = order.Quote?.QuotedAt,
                 PaymentStatus = order.Payment?.Status.ToString(),
                 PaymentAmount = order.Payment?.Amount,
+                AmountPaid = order.Payment?.AmountPaid ?? 0m,
+                BalanceDue = Math.Max(0, (order.Payment?.Amount ?? order.Total ?? 0m) - (order.Payment?.AmountPaid ?? 0m)),
+                DepositAmount = order.Total is > 0 && (order.Payment?.AmountPaid ?? 0m) <= 0
+                    ? Payments.OnlinePaymentService.DepositFor(order.Payment?.Amount ?? order.Total.Value)
+                    : null,
                 PaymentRejectionReason = order.Payment?.Status == Domain.Enums.PaymentStatus.Rejected ? order.Payment.Notes : null,
                 CreatedAt = order.CreatedAt,
                 Items = MapItems(order)
@@ -112,6 +117,7 @@ namespace AuraNova.Infrastructure.Orders
             .ThenInclude(i => i.Product)
             .Include(o => o.DeliveryZone)
             .Include(o => o.MeetingPoint)
+            .Include(o => o.Payment)
             .Include(o => o.ReferenceImages);
 
         private async Task<PublicTrackingResponse> MapAsync(Order order)
@@ -175,7 +181,10 @@ namespace AuraNova.Infrastructure.Orders
                     Subtotal = order.Subtotal,
                     DeliveryCost = order.DeliveryCost,
                     CustomizationCost = order.CustomizationCost,
-                    Total = order.Total
+                    Total = order.Total,
+                    AmountPaid = order.Payment?.AmountPaid ?? 0m,
+                    // Solo hay saldo cuando ya se pagó el adelanto
+                    BalanceDue = order.Payment is { AmountPaid: > 0 } paid ? Math.Max(0, paid.Amount - paid.AmountPaid) : 0m
                 },
 
                 Estimates = new PublicTrackingEstimates

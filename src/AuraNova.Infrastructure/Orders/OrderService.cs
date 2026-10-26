@@ -669,12 +669,17 @@ namespace AuraNova.Infrastructure.Orders
             });
 
             await _db.SaveChangesAsync();
+
+            // Aviso de "pedido listo" (incluye el saldo a pagar si solo pagó el adelanto)
+            await _notificationService.NotifyAsync(order.Id, NotificationType.OrderReady);
         }
 
         public async Task DeliverToAgencyAsync(Guid id, string provider, string trackingCode, string? proofUrl)
         {
-            var order = await _db.Orders.FirstOrDefaultAsync(o => o.Id == id);
+            var order = await _db.Orders.Include(o => o.Payment).FirstOrDefaultAsync(o => o.Id == id);
             if (order == null) throw new OrderNotFoundException("Pedido no encontrado.");
+
+            OrderBalance.EnsurePaidBeforeHandover(order, OrderStatus.DeliveredToAgency);
 
             if (order.DeliveryType != DeliveryType.NationalShipping)
                 throw new OrderValidationException("Solo los envíos nacionales pueden entregarse a agencia.");

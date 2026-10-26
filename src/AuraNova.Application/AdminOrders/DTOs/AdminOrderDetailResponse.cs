@@ -83,9 +83,27 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public string PaymentStatus { get; set; } = string.Empty;
         public string PaymentMethod { get; set; } = string.Empty;
         public decimal Amount { get; set; }
+        /// <summary>Lo ya cobrado (con el adelanto del 50% queda saldo).</summary>
+        public decimal AmountPaid { get; set; }
+        public decimal BalanceDue { get; set; }
         public string? EvidenceUrl { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? VerifiedAt { get; set; }
+        /// <summary>Cobros con Mercado Pago (aprobados, rechazados o en proceso).</summary>
+        public List<AdminPaymentTransaction> Transactions { get; set; } = new List<AdminPaymentTransaction>();
+    }
+
+    public class AdminPaymentTransaction
+    {
+        public string MethodId { get; set; } = string.Empty;
+        public string? MethodType { get; set; }
+        public decimal Amount { get; set; }
+        public bool IsDeposit { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? StatusDetail { get; set; }
+        public bool Approved { get; set; }
+        public string? ExternalOrderId { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
     }
 
     public class AdminOrderItem

@@ -204,27 +204,23 @@ namespace AuraNova.Infrastructure.Notifications
         public async Task<string> BuildReadyMessageAsync(Order order)
         {
             await Task.CompletedTask;
-            if (order.DeliveryType == DeliveryType.Delivery)
+            var where = order.DeliveryType switch
             {
-                return $"""
-                    Hola {GetName(order)}
-                    
-                    Tu pedido {order.OrderCode} ya está listo para ser entregado.
-                    
-                    Tipo de entrega: Delivery
-                    
-                    Pronto coordinaremos la entrega contigo.
-                    
-                    Pedido: {order.OrderCode}
-                    Código de seguimiento: {order.TrackingToken}
-                    Síguelo aquí: {TrackingUrl(order)}
-                    """.Replace("                    ", "");
-            }
+                DeliveryType.Delivery => "ya está listo para el delivery",
+                DeliveryType.NationalShipping => "ya está listo para enviarlo por agencia",
+                _ => "ya está listo para recogerlo en el punto de encuentro"
+            };
+
+            // Solo pagó el adelanto: el pedido sale cuando pague el saldo
+            var due = order.Payment == null ? 0m : Math.Max(0m, order.Payment.Amount - order.Payment.AmountPaid);
+            var balance = due > 0
+                ? $"\n\nPara entregarlo falta pagar el saldo de S/ {due:F2}.\nPaga con tarjeta o Yape aquí: {_siteUrl}/pago/{order.Id}"
+                : "";
 
             return $"""
                 Hola {GetName(order)}
                 
-                Tu pedido {order.OrderCode} ya está listo para recoger en el punto de encuentro.
+                Tu pedido {order.OrderCode} {where}.{balance}
                 
                 Pedido: {order.OrderCode}
                 Código de seguimiento: {order.TrackingToken}

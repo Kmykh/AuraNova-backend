@@ -158,6 +158,11 @@ builder.Services.AddScoped<AuraNova.Application.Storage.Interfaces.IImageMainten
 // register payment services
 builder.Services.AddScoped<AuraNova.Application.Payments.Interfaces.IPaymentService, AuraNova.Infrastructure.Payments.PaymentService>();
 
+// Pagos en la página con Mercado Pago (Checkout API, API de Orders). Access Token y firma solo por variables de entorno.
+builder.Services.Configure<AuraNova.Infrastructure.Payments.MercadoPagoSettings>(builder.Configuration.GetSection("MercadoPago"));
+builder.Services.AddScoped<AuraNova.Infrastructure.Payments.IMercadoPagoGateway, AuraNova.Infrastructure.Payments.MercadoPagoGateway>();
+builder.Services.AddScoped<AuraNova.Application.OnlinePayments.Interfaces.IOnlinePaymentService, AuraNova.Infrastructure.Payments.OnlinePaymentService>();
+
 // register order status transition service (state machine)
 builder.Services.AddSingleton<AuraNova.Application.Orders.Interfaces.IOrderStatusTransitionService, AuraNova.Infrastructure.Orders.OrderStatusTransitionService>();
 
@@ -268,6 +273,8 @@ builder.Services.AddRateLimiter(options =>
     AddPerClientWindow(options, "tracking_policy", 60, TimeSpan.FromMinutes(1), ByIp);
     AddPerClientWindow(options, "create_order_policy", 15, TimeSpan.FromMinutes(1), ByIp);
     AddPerClientWindow(options, "evidence_upload_policy", 5, TimeSpan.FromMinutes(10), ByIp);
+    // Intentos de pago con Mercado Pago (una tarjeta rechazada suele reintentarse un par de veces)
+    AddPerClientWindow(options, "online_payment_policy", 12, TimeSpan.FromMinutes(10), ByIp);
     AddPerClientWindow(options, "accept_quote_policy", 10, TimeSpan.FromMinutes(1), ByIp);
     AddPerClientWindow(options, "admin_policy", 200, TimeSpan.FromMinutes(1), ByUserOrIp);
 });

@@ -17,7 +17,7 @@ namespace AuraNova.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.31")
+                .HasAnnotation("ProductVersion", "8.0.33")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -824,6 +824,12 @@ namespace AuraNova.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<decimal>("AmountPaid")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasDefaultValue(0m);
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -856,6 +862,78 @@ namespace AuraNova.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Payments", (string)null);
+                });
+
+            modelBuilder.Entity("AuraNova.Domain.Entities.PaymentTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTimeOffset?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalOrderId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ExternalPaymentId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsDeposit")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("MethodId")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("MethodType")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("StatusDetail")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalOrderId")
+                        .IsUnique()
+                        .HasFilter("\"ExternalOrderId\" IS NOT NULL");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("PaymentId");
+
+                    b.ToTable("PaymentTransactions", (string)null);
                 });
 
             modelBuilder.Entity("AuraNova.Domain.Entities.Product", b =>
@@ -1150,6 +1228,17 @@ namespace AuraNova.Infrastructure.Migrations
                     b.Navigation("Order");
                 });
 
+            modelBuilder.Entity("AuraNova.Domain.Entities.PaymentTransaction", b =>
+                {
+                    b.HasOne("AuraNova.Domain.Entities.Payment", "Payment")
+                        .WithMany("Transactions")
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Payment");
+                });
+
             modelBuilder.Entity("AuraNova.Domain.Entities.Product", b =>
                 {
                     b.HasOne("AuraNova.Domain.Entities.Category", "Category")
@@ -1227,6 +1316,11 @@ namespace AuraNova.Infrastructure.Migrations
                     b.Navigation("ReferenceImages");
 
                     b.Navigation("StatusHistory");
+                });
+
+            modelBuilder.Entity("AuraNova.Domain.Entities.Payment", b =>
+                {
+                    b.Navigation("Transactions");
                 });
 
             modelBuilder.Entity("AuraNova.Domain.Entities.Product", b =>

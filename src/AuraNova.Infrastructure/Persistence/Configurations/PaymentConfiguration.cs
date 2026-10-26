@@ -12,6 +12,7 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
             builder.HasKey(p => p.Id);
 
             builder.Property(p => p.Amount).HasPrecision(18, 2).IsRequired();
+            builder.Property(p => p.AmountPaid).HasPrecision(18, 2).IsRequired().HasDefaultValue(0m);
             builder.Property(p => p.Method).IsRequired();
             builder.Property(p => p.Status).IsRequired();
 
@@ -27,6 +28,34 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
                 .WithOne(o => o.Payment)
                 .HasForeignKey<Payment>(p => p.OrderId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(p => p.Transactions)
+                .WithOne(t => t.Payment)
+                .HasForeignKey(t => t.PaymentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
+    }
+
+    public class PaymentTransactionConfiguration : IEntityTypeConfiguration<PaymentTransaction>
+    {
+        public void Configure(EntityTypeBuilder<PaymentTransaction> builder)
+        {
+            builder.ToTable("PaymentTransactions");
+            builder.HasKey(t => t.Id);
+
+            builder.Property(t => t.Provider).IsRequired().HasMaxLength(30);
+            builder.Property(t => t.ExternalOrderId).HasMaxLength(100);
+            builder.Property(t => t.ExternalPaymentId).HasMaxLength(100);
+            builder.Property(t => t.MethodId).IsRequired().HasMaxLength(40);
+            builder.Property(t => t.MethodType).HasMaxLength(40);
+            builder.Property(t => t.Amount).HasPrecision(18, 2).IsRequired();
+            builder.Property(t => t.Status).IsRequired().HasMaxLength(40);
+            builder.Property(t => t.StatusDetail).HasMaxLength(100);
+            builder.Property(t => t.CreatedAt).IsRequired();
+
+            // Una order de Mercado Pago corresponde a un solo cobro nuestro (el webhook la busca por aquí)
+            builder.HasIndex(t => t.ExternalOrderId).IsUnique().HasFilter("\"ExternalOrderId\" IS NOT NULL");
+            builder.HasIndex(t => t.OrderId);
         }
     }
 }

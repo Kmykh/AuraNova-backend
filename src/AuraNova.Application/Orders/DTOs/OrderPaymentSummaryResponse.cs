@@ -24,6 +24,11 @@ namespace AuraNova.Application.Orders.DTOs
 
         public string? PaymentStatus { get; set; }
         public decimal? PaymentAmount { get; set; }
+        /// <summary>Lo ya pagado y lo que falta (con el adelanto del 50% queda saldo).</summary>
+        public decimal AmountPaid { get; set; }
+        public decimal BalanceDue { get; set; }
+        /// <summary>Monto del adelanto (50%) que se puede pagar en el primer pago.</summary>
+        public decimal? DepositAmount { get; set; }
         /// <summary>Motivo del último rechazo, para que el cliente sepa qué corregir.</summary>
         public string? PaymentRejectionReason { get; set; }
 
