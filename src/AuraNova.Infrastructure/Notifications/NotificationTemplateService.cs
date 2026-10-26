@@ -151,12 +151,16 @@ namespace AuraNova.Infrastructure.Notifications
         public async Task<string> BuildPaymentConfirmedMessageAsync(Order order)
         {
             var businessName = await GetBusinessNameAsync();
+            var due = order.Payment == null ? 0m : Math.Max(0m, order.Payment.Amount - order.Payment.AmountPaid);
+            var paidLine = due > 0
+                ? $"Recibimos tu adelanto de S/ {order.Payment!.AmountPaid:F2}. Ahora comenzaremos a preparar tu pedido.\nEl saldo de S/ {due:F2} lo pagas antes de la entrega desde: {_siteUrl}/pago/{order.Id}"
+                : "Ahora comenzaremos a preparar tu pedido.";
             return $"""
                 Hola {GetName(order)}
                 
-                Tu pago para el pedido {order.OrderCode} ha sido confirmado
+                Tu pago para el pedido {order.OrderCode} ha sido confirmado.
                 
-                Ahora comenzaremos a preparar tu pedido.
+                {paidLine}
                 
                 Pedido: {order.OrderCode}
                 Código de seguimiento: {order.TrackingToken}

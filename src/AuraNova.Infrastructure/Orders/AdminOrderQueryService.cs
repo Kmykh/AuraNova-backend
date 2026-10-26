@@ -247,7 +247,12 @@ namespace AuraNova.Infrastructure.Orders
                     DeliveryAddress = order.DeliveryAddress,
                     Department = order.Department,
                     Province = order.Province,
-                    District = order.District
+                    District = order.District,
+                    RecipientName = order.RecipientName,
+                    RecipientPhone = order.RecipientPhone,
+                    RecipientDocument = order.RecipientDocument,
+                    DeliveryReference = order.DeliveryReference,
+                    PreferredAgency = order.PreferredAgency
                 },
                 Items = order.Items?.Select(i => new AdminOrderItem
                 {

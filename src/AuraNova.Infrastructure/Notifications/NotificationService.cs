@@ -8,6 +8,8 @@ using AuraNova.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using AuraNova.Infrastructure.Notifications.Email;
 
 namespace AuraNova.Infrastructure.Notifications
 {
@@ -16,8 +18,12 @@ namespace AuraNova.Infrastructure.Notifications
         INotificationTemplateService templateService,
         IWhatsAppMessageService whatsAppService,
         ILogger<NotificationService> logger,
-        IConfiguration configuration) : INotificationService
+        IConfiguration configuration,
+        IEmailQueue? emailQueue = null,
+        IOptions<EmailSettings>? emailOptions = null,
+        IOptions<PublicSiteSettings>? siteOptions = null) : INotificationService
     {
+        private readonly string _siteUrl = (siteOptions?.Value.BaseUrl ?? new PublicSiteSettings().BaseUrl).TrimEnd('/');
         private readonly AppDbContext _db = db;
         private readonly INotificationTemplateService _templateService = templateService;
         private readonly IWhatsAppMessageService _whatsAppService = whatsAppService;
@@ -86,12 +92,113 @@ namespace AuraNova.Infrastructure.Notifications
                 await _db.SaveChangesAsync();
 
                 _logger.LogInformation("Notification {Type} generated for order {OrderId}", type, orderId);
+
+                await QueueEmailAsync(order, type, message);
             }
             catch (Exception ex)
             {
                 // We DO NOT rethrow. The main business transaction has already succeeded.
                 _logger.LogError(ex, "Failed to generate notification {Type} for order {OrderId}", type, orderId);
             }
+        }
+
+        /// <summary>El mismo mensaje por correo, enviado automáticamente en segundo plano.</summary>
+        private async Task QueueEmailAsync(Order order, NotificationType type, string message)
+        {
+            if (emailQueue == null || emailOptions?.Value.IsConfigured != true)
+                return;
+
+            var email = order.Customer?.Email?.Trim();
+            if (string.IsNullOrWhiteSpace(email) || !System.Net.Mail.MailAddress.TryCreate(email, out _))
+                return;
+
+            var notification = new Notification
+            {
+                OrderId = order.Id,
+                Type = type,
+                Channel = NotificationChannel.Email,
+                Status = NotificationStatus.Generated,
+                Recipient = email,
+                Subject = EmailSubject(type, order),
+                Message = message,
+                ChannelUrl = EmailActionUrl(type, order)
+            };
+            _db.Set<Notification>().Add(notification);
+            await _db.SaveChangesAsync();
+
+            emailQueue.Enqueue(notification.Id);
+        }
+
+        private static decimal BalanceDue(Order order) =>
+            order.Payment == null ? 0m : Math.Max(0m, order.Payment.Amount - order.Payment.AmountPaid);
+
+        /// <summary>El botón del correo lleva a pagar cuando hay algo pendiente; si no, al seguimiento.</summary>
+        private string EmailActionUrl(NotificationType type, Order order)
+        {
+            var needsPayment = type switch
+            {
+                NotificationType.QuoteReady or NotificationType.PaymentRejected => true,
+                NotificationType.OrderCreated => order.Status == OrderStatus.WaitingPayment,
+                NotificationType.PaymentConfirmed or NotificationType.OrderReady => BalanceDue(order) > 0,
+                _ => false
+            };
+            return needsPayment ? $"{_siteUrl}/pago/{order.Id}" : $"{_siteUrl}/seguimiento/{order.TrackingToken}";
+        }
+
+        public static string EmailSubject(NotificationType type, Order order) => type switch
+        {
+            NotificationType.OrderCreated => order.IsCustomOrder
+                ? $"Recibimos tu pedido personalizado {order.OrderCode}"
+                : $"Tu pedido {order.OrderCode} está registrado",
+            NotificationType.QuoteReady => $"Tu cotización del pedido {order.OrderCode} está lista",
+            NotificationType.PaymentReported => $"Recibimos tu comprobante · {order.OrderCode}",
+            NotificationType.PaymentConfirmed => $"¡Pago confirmado! Pedido {order.OrderCode}",
+            NotificationType.PaymentRejected => $"No pudimos validar tu pago · {order.OrderCode}",
+            NotificationType.OrderPreparing => $"Tu pedido {order.OrderCode} está en el taller",
+            NotificationType.OrderReady => BalanceDue(order) > 0
+                ? $"Tu pedido {order.OrderCode} está listo: falta el saldo"
+                : $"Tu pedido {order.OrderCode} está listo",
+            NotificationType.OrderShipped => $"Tu pedido {order.OrderCode} va en camino",
+            NotificationType.OrderDelivered => $"¡Tu pedido {order.OrderCode} fue entregado!",
+            NotificationType.OrderCancelled => $"Tu pedido {order.OrderCode} fue cancelado",
+            _ => $"Novedades de tu pedido {order.OrderCode}"
+        };
+
+        public async Task<bool> ResendEmailAsync(Guid notificationId)
+        {
+            var notification = await _db.Set<Notification>().FirstOrDefaultAsync(n => n.Id == notificationId);
+            if (notification == null || notification.Channel != NotificationChannel.Email || emailQueue == null)
+                return false;
+
+            notification.Status = NotificationStatus.Generated;
+            notification.UpdatedAt = DateTimeOffset.UtcNow;
+            await _db.SaveChangesAsync();
+            emailQueue.Enqueue(notification.Id);
+            return true;
+        }
+
+        public async Task<IReadOnlyList<NotificationResponse>> GetPendingWhatsAppAsync()
+        {
+            var since = DateTimeOffset.UtcNow.AddDays(-14);
+            return await _db.Set<Notification>()
+                .Where(n => n.Channel == NotificationChannel.WhatsApp && n.Status == NotificationStatus.Generated && n.CreatedAt > since)
+                .OrderBy(n => n.CreatedAt)
+                .Select(n => new NotificationResponse
+                {
+                    Id = n.Id,
+                    OrderId = n.OrderId,
+                    OrderCode = n.Order!.OrderCode,
+                    CustomerName = n.Order.Customer != null ? n.Order.Customer.Name : null,
+                    Type = n.Type.ToString(),
+                    Channel = n.Channel.ToString(),
+                    Status = n.Status.ToString(),
+                    Recipient = n.Recipient,
+                    Message = n.Message,
+                    ChannelUrl = n.ChannelUrl,
+                    CreatedAt = n.CreatedAt,
+                    UpdatedAt = n.UpdatedAt
+                })
+                .ToListAsync();
         }
 
         private async Task<string> BuildMessageAsync(NotificationType type, Order order, string? reason)
@@ -126,8 +233,11 @@ namespace AuraNova.Infrastructure.Notifications
                     Channel = n.Channel.ToString(),
                     Status = n.Status.ToString(),
                     Recipient = n.Recipient,
+                    Subject = n.Subject,
                     Message = n.Message,
                     ChannelUrl = n.ChannelUrl,
+                    ErrorMessage = n.ErrorMessage,
+                    SentAt = n.SentAt,
                     CreatedAt = n.CreatedAt,
                     UpdatedAt = n.UpdatedAt
                 })

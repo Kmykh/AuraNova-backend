@@ -21,5 +21,23 @@ namespace AuraNova.Application.Orders.DTOs
 
         [MaxLength(200)]
         public string? District { get; set; }
+
+        /// <summary>Quién recibe, si no es el mismo cliente (regalos).</summary>
+        [MaxLength(120)]
+        public string? RecipientName { get; set; }
+
+        [MaxLength(20)]
+        public string? RecipientPhone { get; set; }
+
+        /// <summary>DNI (8 dígitos) o CE de quien recoge en la agencia.</summary>
+        [MaxLength(15)]
+        public string? RecipientDocument { get; set; }
+
+        [MaxLength(250)]
+        public string? DeliveryReference { get; set; }
+
+        /// <summary>Shalom u Olva (envío nacional).</summary>
+        [MaxLength(30)]
+        public string? PreferredAgency { get; set; }
     }
 }

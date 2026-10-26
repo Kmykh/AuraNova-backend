@@ -187,6 +187,13 @@ builder.Services.Configure<AuraNova.Infrastructure.Notifications.PublicSiteSetti
 builder.Services.AddScoped<AuraNova.Application.Notifications.Interfaces.INotificationTemplateService, AuraNova.Infrastructure.Notifications.NotificationTemplateService>();
 builder.Services.AddScoped<AuraNova.Application.Notifications.Interfaces.INotificationService, AuraNova.Infrastructure.Notifications.NotificationService>();
 
+// Correos automáticos por SMTP (sección "Email"); sin credenciales quedan desactivados
+builder.Services.Configure<AuraNova.Infrastructure.Notifications.Email.EmailSettings>(builder.Configuration.GetSection("Email"));
+builder.Services.AddSingleton<AuraNova.Infrastructure.Notifications.Email.IEmailQueue, AuraNova.Infrastructure.Notifications.Email.EmailQueue>();
+builder.Services.AddScoped<AuraNova.Infrastructure.Notifications.Email.IEmailSender, AuraNova.Infrastructure.Notifications.Email.SmtpEmailSender>();
+builder.Services.AddScoped<AuraNova.Infrastructure.Notifications.Email.EmailNotificationDispatcher>();
+builder.Services.AddHostedService<AuraNova.API.Services.EmailDispatchWorker>();
+
 // register dashboard services
 builder.Services.AddScoped<AuraNova.Application.Dashboard.Interfaces.IDashboardService, AuraNova.Infrastructure.Dashboard.DashboardService>();
 

@@ -12,5 +12,11 @@ namespace AuraNova.Application.Notifications.Interfaces
         Task<IReadOnlyList<NotificationResponse>> GetByOrderIdAsync(Guid orderId);
         Task<NotificationResponse?> GetByIdAsync(Guid id);
         Task<WhatsAppPreparationResponse?> PrepareWhatsAppAsync(Guid id);
+
+        /// <summary>Vuelve a enviar un correo (fallido o no recibido).</summary>
+        Task<bool> ResendEmailAsync(Guid notificationId);
+
+        /// <summary>WhatsApp generados que el equipo aún no abrió para enviar (bandeja del panel).</summary>
+        Task<IReadOnlyList<NotificationResponse>> GetPendingWhatsAppAsync();
     }
 }

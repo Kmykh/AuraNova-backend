@@ -159,6 +159,8 @@ namespace AuraNova.Infrastructure.Orders
                     throw new OrderValidationException($"Tipo de entrega no soportado: '{deliveryType}'.");
             }
 
+            var recipient = RecipientDetails.From(request.Delivery);
+
             // --- 8. Build entities inside a transaction ---
             var supportsTransactions = _db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory";
             Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
@@ -249,6 +251,11 @@ namespace AuraNova.Infrastructure.Orders
                     Department = request.Delivery.Department?.Trim(),
                     Province = request.Delivery.Province?.Trim(),
                     District = request.Delivery.District?.Trim(),
+                    RecipientName = recipient.Name,
+                    RecipientPhone = recipient.Phone,
+                    RecipientDocument = recipient.Document,
+                    DeliveryReference = recipient.Reference,
+                    PreferredAgency = recipient.Agency,
                     Subtotal = orderSubtotal,
                     DeliveryCost = deliveryCost,
                     Total = orderTotal,
@@ -362,6 +369,7 @@ namespace AuraNova.Infrastructure.Orders
         {
             // --- 0. Brief validation (before opening the transaction) ---
             var referenceLinks = CustomOrderBrief.CleanLinks(request.ReferenceLinks);
+            var recipient = RecipientDetails.From(request.Delivery);
 
             // Peru (UTC-5): the customer can't ask for a date that already passed
             var todayInPeru = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-5));
@@ -461,6 +469,11 @@ namespace AuraNova.Infrastructure.Orders
                     Department = request.Delivery.Department?.Trim(),
                     Province = request.Delivery.Province?.Trim(),
                     District = request.Delivery.District?.Trim(),
+                    RecipientName = recipient.Name,
+                    RecipientPhone = recipient.Phone,
+                    RecipientDocument = recipient.Document,
+                    DeliveryReference = recipient.Reference,
+                    PreferredAgency = recipient.Agency,
                     Subtotal = 0, // Custom order base price is 0 until quoted
                     DeliveryCost = deliveryCost,
                     Total = null, // Custom orders always need quoting for total

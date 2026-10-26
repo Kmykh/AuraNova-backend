@@ -40,5 +40,26 @@ namespace AuraNova.API.Controllers
             var response = await _notificationService.PrepareWhatsAppAsync(notificationId);
             return Ok(response);
         }
+
+        /// <summary>Vuelve a enviar un correo del pedido (por ejemplo, si falló o el cliente no lo recibió).</summary>
+        [HttpPost("orders/{orderId:guid}/notifications/{notificationId:guid}/resend-email")]
+        public async Task<IActionResult> ResendEmail(Guid orderId, Guid notificationId)
+        {
+            var notification = await _notificationService.GetByIdAsync(notificationId);
+            if (notification == null || notification.OrderId != orderId)
+                return NotFound(new { message = "Notificación no encontrada." });
+
+            if (!await _notificationService.ResendEmailAsync(notificationId))
+                return Problem(detail: "Solo se pueden reenviar correos, y el envío de correos debe estar configurado.", statusCode: StatusCodes.Status400BadRequest);
+
+            return Accepted(new { message = "Correo en cola para reenvío." });
+        }
+
+        /// <summary>Bandeja: mensajes de WhatsApp listos que el equipo aún no abrió para enviar.</summary>
+        [HttpGet("notifications/pending-whatsapp")]
+        public async Task<IActionResult> GetPendingWhatsApp()
+        {
+            return Ok(await _notificationService.GetPendingWhatsAppAsync());
+        }
     }
 }

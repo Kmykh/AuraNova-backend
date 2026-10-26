@@ -65,6 +65,11 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public string? Department { get; set; }
         public string? Province { get; set; }
         public string? District { get; set; }
+        public string? RecipientName { get; set; }
+        public string? RecipientPhone { get; set; }
+        public string? RecipientDocument { get; set; }
+        public string? DeliveryReference { get; set; }
+        public string? PreferredAgency { get; set; }
     }
 
     public class AdminOrderQuote

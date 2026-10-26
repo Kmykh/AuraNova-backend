@@ -41,6 +41,12 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
 
             builder.HasOne(o => o.Quote).WithOne(q => q.Order).HasForeignKey<Quote>(q => q.OrderId).OnDelete(DeleteBehavior.Cascade);
 
+            builder.Property(o => o.RecipientName).HasMaxLength(120);
+            builder.Property(o => o.RecipientPhone).HasMaxLength(20);
+            builder.Property(o => o.RecipientDocument).HasMaxLength(15);
+            builder.Property(o => o.DeliveryReference).HasMaxLength(250);
+            builder.Property(o => o.PreferredAgency).HasMaxLength(30);
+
             // Custom order brief
             builder.HasMany(o => o.ReferenceImages).WithOne(i => i.Order).HasForeignKey(i => i.OrderId).OnDelete(DeleteBehavior.Cascade);
             builder.Property(o => o.Occasion).HasMaxLength(60);
