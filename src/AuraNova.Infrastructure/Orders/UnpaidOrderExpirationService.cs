@@ -41,6 +41,9 @@ namespace AuraNova.Infrastructure.Orders
                 .AsNoTracking()
                 .Where(o => o.Status == OrderStatus.WaitingPayment && !o.IsCustomOrder)
                 .Where(o => o.Payment == null || o.Payment.Status != PaymentStatus.Reported)
+                // Ni los que tienen un pago de Mercado Pago en revisión: la conciliación lo resolverá
+                .Where(o => !db.PaymentTransactions.Any(t => t.OrderId == o.Id && t.ApprovedAt == null &&
+                                                             (t.Status == "processing" || t.Status == "action_required")))
                 .Select(o => new { o.Id, o.OrderCode, LastChange = o.UpdatedAt ?? o.CreatedAt })
                 .ToListAsync(cancellationToken);
 

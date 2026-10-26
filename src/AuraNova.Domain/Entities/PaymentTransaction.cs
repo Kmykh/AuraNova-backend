@@ -32,8 +32,12 @@ namespace AuraNova.Domain.Entities
         public string Status { get; set; } = "created";
         public string? StatusDetail { get; set; }
 
+        /// <summary>Lo devuelto al cliente desde el panel (total o parcial). Se descuenta de lo pagado.</summary>
+        public decimal RefundedAmount { get; set; }
+
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset? UpdatedAt { get; set; }
         public DateTimeOffset? ApprovedAt { get; set; }
+        public DateTimeOffset? RefundedAt { get; set; }
     }
 }

@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using AuraNova.Application.Auth.Interfaces;
 using AuraNova.Application.Notifications.Interfaces;
 using AuraNova.Application.OnlinePayments.DTOs;
 using AuraNova.Application.OnlinePayments.Interfaces;
@@ -21,10 +22,12 @@ namespace AuraNova.Infrastructure.Payments
         IMercadoPagoGateway gateway,
         INotificationService notificationService,
         ILogger<OnlinePaymentService> logger,
-        IStorageUrlResolver? storageUrls = null) : IOnlinePaymentService
+        IStorageUrlResolver? storageUrls = null,
+        ICurrentUserService? currentUser = null) : IOnlinePaymentService
     {
         // Un cobro "en proceso" bloquea otro intento durante este tiempo (evita pagar dos veces)
         private static readonly TimeSpan PendingLock = TimeSpan.FromMinutes(15);
+        private static readonly string[] UnresolvedStatuses = ["created", "processing", "action_required"];
         private static readonly Regex MethodIdPattern = new("^[a-z_]{2,30}$", RegexOptions.Compiled);
 
         public static decimal DepositFor(decimal total) => Math.Round(total / 2m, 2, MidpointRounding.AwayFromZero);
@@ -202,6 +205,211 @@ namespace AuraNova.Infrastructure.Payments
             await ApplyAsync(order, order.Payment!, transaction, result, cancellationToken);
         }
 
+        public async Task<RefundOnlinePaymentResult> RefundAsync(Guid orderId, Guid transactionId, RefundOnlinePaymentRequest request, CancellationToken cancellationToken = default)
+        {
+            var order = await db.Orders
+                .Include(o => o.Payment!).ThenInclude(p => p.Transactions)
+                .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken)
+                ?? throw new OnlinePaymentException("No encontramos este pedido.");
+            var transaction = order.Payment?.Transactions?.FirstOrDefault(t => t.Id == transactionId)
+                ?? throw new OnlinePaymentException("No encontramos ese cobro en el pedido.");
+
+            if (transaction.ApprovedAt == null || transaction.ExternalOrderId == null)
+                throw new OnlinePaymentException("Solo se pueden devolver cobros aprobados por Mercado Pago.");
+
+            var refundable = transaction.Amount - transaction.RefundedAmount;
+            if (refundable <= 0)
+                throw new OnlinePaymentException("Este cobro ya fue devuelto por completo.");
+
+            var amount = Math.Round(request.Amount ?? refundable, 2, MidpointRounding.AwayFromZero);
+            if (amount <= 0 || amount > refundable)
+                throw new OnlinePaymentException($"Puedes devolver como máximo {Money(refundable)} de este cobro.");
+
+            var isPartial = amount < refundable;
+            if (isPartial && transaction.ExternalPaymentId == null)
+                throw new OnlinePaymentException("Este cobro solo se puede devolver completo.");
+
+            try
+            {
+                // Misma clave para el mismo pedido de devolución: un doble clic no devuelve dos veces
+                var key = MercadoPagoGateway.IdempotencyKeyFor($"refund:{transaction.Id}:{transaction.RefundedAmount}:{amount}");
+                await gateway.RefundAsync(transaction.ExternalOrderId, isPartial ? transaction.ExternalPaymentId : null,
+                    isPartial ? amount : null, key, cancellationToken);
+            }
+            catch (MercadoPagoGatewayException ex)
+            {
+                throw new OnlinePaymentException(ex.Message);
+            }
+
+            var reason = string.IsNullOrWhiteSpace(request.Reason) ? "" : $" Motivo: {request.Reason.Trim()}";
+            await RecordRefundAsync(order, order.Payment!, transaction, amount,
+                $"Devolución de {Money(amount)} ({MethodName(transaction)}) por Mercado Pago.{reason}", cancellationToken);
+
+            var paid = order.Payment!.AmountPaid;
+            return new RefundOnlinePaymentResult
+            {
+                Refunded = amount,
+                AmountPaid = paid,
+                BalanceDue = order.Payment.Amount - paid,
+                Message = $"Devolvimos {Money(amount)}. El cliente lo verá en su {MethodName(transaction)} según los plazos de su banco."
+            };
+        }
+
+        public async Task CancelPendingAsync(Guid orderId, CancellationToken cancellationToken = default)
+        {
+            // Mercado Pago solo permite anular orders que esperan una acción del cliente (o recién creadas)
+            var pending = await db.PaymentTransactions
+                .Where(t => t.OrderId == orderId && t.ApprovedAt == null && t.ExternalOrderId != null &&
+                            (t.Status == "action_required" || t.Status == "created"))
+                .ToListAsync(cancellationToken);
+
+            foreach (var transaction in pending)
+            {
+                try
+                {
+                    var result = await gateway.CancelAsync(transaction.ExternalOrderId!, cancellationToken);
+                    transaction.Status = Truncate(result.Status ?? "canceled", 40)!;
+                    transaction.StatusDetail = Truncate(result.Detail, 100);
+                    transaction.UpdatedAt = DateTimeOffset.UtcNow;
+                }
+                catch (MercadoPagoGatewayException ex)
+                {
+                    logger.LogWarning(ex, "No se pudo anular en Mercado Pago la order {ExternalOrderId}", transaction.ExternalOrderId);
+                }
+            }
+
+            if (pending.Count > 0)
+                await db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<int> ReconcilePendingAsync(CancellationToken cancellationToken = default)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var settled = now.AddMinutes(-2);
+            var candidates = await db.PaymentTransactions
+                .Where(t => t.ApprovedAt == null && t.CreatedAt < settled && t.CreatedAt > now.AddDays(-3) &&
+                            (UnresolvedStatuses.Contains(t.Status) ||
+                             // Sin respuesta al crearla (corte de red): puede que Mercado Pago sí la haya cobrado
+                             (t.Status == "error" && t.ExternalOrderId == null && t.CreatedAt > now.AddMinutes(-30))))
+                .OrderBy(t => t.CreatedAt)
+                .Take(50)
+                .ToListAsync(cancellationToken);
+
+            var changed = 0;
+            foreach (var transaction in candidates)
+            {
+                try
+                {
+                    var before = transaction.Status;
+                    var result = transaction.ExternalOrderId != null
+                        ? await gateway.GetOrderAsync(transaction.ExternalOrderId, cancellationToken)
+                        : await gateway.FindByExternalReferenceAsync(transaction.Id.ToString("N"), cancellationToken);
+
+                    if (result == null)
+                    {
+                        if (transaction.ExternalOrderId == null && transaction.CreatedAt < now.AddMinutes(-30))
+                        {
+                            transaction.Status = "error";
+                            transaction.StatusDetail = "Mercado Pago no registró este intento.";
+                            transaction.UpdatedAt = now;
+                            await db.SaveChangesAsync(cancellationToken);
+                        }
+                        continue;
+                    }
+
+                    var order = await db.Orders
+                        .Include(o => o.Payment!).ThenInclude(p => p.Transactions)
+                        .FirstAsync(o => o.Id == transaction.OrderId, cancellationToken);
+                    await ApplyAsync(order, order.Payment!, transaction, result, cancellationToken);
+
+                    if (transaction.Status != before)
+                        changed++;
+                }
+                catch (MercadoPagoGatewayException ex)
+                {
+                    logger.LogWarning(ex, "Conciliación: no se pudo consultar el cobro {TransactionId}", transaction.Id);
+                }
+            }
+
+            if (changed > 0)
+                logger.LogInformation("Conciliación de Mercado Pago: {Changed} cobro(s) actualizados", changed);
+
+            // Los avisos recibidos se guardan 30 días
+            if (db.Database.IsRelational())
+                await db.PaymentWebhookEvents.Where(e => e.ReceivedAt < now.AddDays(-30)).ExecuteDeleteAsync(cancellationToken);
+
+            return changed;
+        }
+
+        public async Task LogWebhookAsync(string? topic, string? resourceId, string result, string? detail, CancellationToken cancellationToken = default)
+        {
+            db.PaymentWebhookEvents.Add(new PaymentWebhookEvent
+            {
+                Topic = Truncate(topic, 40),
+                ResourceId = Truncate(resourceId, 100),
+                Result = result,
+                Detail = Truncate(detail, 250)
+            });
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<IReadOnlyList<PaymentWebhookEventResponse>> GetWebhookEventsAsync(int take, CancellationToken cancellationToken = default) =>
+            await db.PaymentWebhookEvents
+                .OrderByDescending(e => e.ReceivedAt)
+                .Take(Math.Clamp(take, 1, 200))
+                .Select(e => new PaymentWebhookEventResponse
+                {
+                    ReceivedAt = e.ReceivedAt,
+                    Topic = e.Topic,
+                    ResourceId = e.ResourceId,
+                    Result = e.Result,
+                    Detail = e.Detail
+                })
+                .ToListAsync(cancellationToken);
+
+        public async Task<OnlinePaymentReport> GetReportAsync(DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default)
+        {
+            var rows = await db.PaymentTransactions
+                .Where(t => t.CreatedAt >= from && t.CreatedAt < to)
+                .Join(db.Orders, t => t.OrderId, o => o.Id, (t, o) => new { Transaction = t, o.OrderCode, CustomerName = o.Customer!.Name })
+                .OrderByDescending(x => x.Transaction.CreatedAt)
+                .Take(2000)
+                .Select(x => new OnlinePaymentReportRow
+                {
+                    Id = x.Transaction.Id,
+                    OrderId = x.Transaction.OrderId,
+                    OrderCode = x.OrderCode,
+                    CustomerName = x.CustomerName,
+                    MethodId = x.Transaction.MethodId,
+                    MethodType = x.Transaction.MethodType,
+                    Amount = x.Transaction.Amount,
+                    RefundedAmount = x.Transaction.RefundedAmount,
+                    IsDeposit = x.Transaction.IsDeposit,
+                    Status = x.Transaction.Status,
+                    StatusDetail = x.Transaction.StatusDetail,
+                    Approved = x.Transaction.ApprovedAt != null,
+                    ExternalOrderId = x.Transaction.ExternalOrderId,
+                    CreatedAt = x.Transaction.CreatedAt,
+                    ApprovedAt = x.Transaction.ApprovedAt
+                })
+                .ToListAsync(cancellationToken);
+
+            var collected = rows.Where(r => r.Approved).Sum(r => r.Amount);
+            var refunded = rows.Sum(r => r.RefundedAmount);
+            return new OnlinePaymentReport
+            {
+                From = from,
+                To = to,
+                Collected = collected,
+                Refunded = refunded,
+                Net = collected - refunded,
+                ApprovedCount = rows.Count(r => r.Approved),
+                PendingCount = rows.Count(r => !r.Approved && UnresolvedStatuses.Contains(r.Status)),
+                RejectedCount = rows.Count(r => !r.Approved && !UnresolvedStatuses.Contains(r.Status)),
+                Rows = rows
+            };
+        }
+
         /// <summary>Guarda el resultado de Mercado Pago y, si se aprobó, suma el pago al pedido una sola vez.</summary>
         private async Task ApplyAsync(Order order, Payment payment, PaymentTransaction transaction, GatewayOrder result, CancellationToken cancellationToken)
         {
@@ -211,6 +419,14 @@ namespace AuraNova.Infrastructure.Payments
             transaction.StatusDetail = Truncate(result.Detail, 100);
             transaction.UpdatedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
+
+            // Devuelto desde el panel de Mercado Pago (no desde el nuestro): se descuenta igual
+            if (result.Status == "refunded" && transaction.ApprovedAt != null && transaction.RefundedAmount < transaction.Amount)
+            {
+                await RecordRefundAsync(order, payment, transaction, transaction.Amount - transaction.RefundedAmount,
+                    "Devolución hecha desde la cuenta de Mercado Pago.", cancellationToken);
+                return;
+            }
 
             if (!result.IsApproved || transaction.ApprovedAt != null)
                 return;
@@ -234,19 +450,22 @@ namespace AuraNova.Infrastructure.Payments
                 await db.SaveChangesAsync(cancellationToken);
             }
 
-            var wasFirstPayment = payment.AmountPaid <= 0;
-            var approvedTotal = await db.PaymentTransactions
-                .Where(t => t.PaymentId == payment.Id && t.ApprovedAt != null)
-                .SumAsync(t => t.Amount, cancellationToken);
+            // Se aprobó cuando el pedido ya estaba cancelado (p. ej. un pago en revisión): se devuelve solo
+            if (order.Status == OrderStatus.Cancelled)
+            {
+                await RefundCancelledOrderPaymentAsync(order, payment, transaction, cancellationToken);
+                return;
+            }
 
-            payment.AmountPaid = Math.Min(approvedTotal, payment.Amount);
+            var wasFirstPayment = payment.AmountPaid <= 0;
+            payment.AmountPaid = Math.Min(await NetPaidAsync(payment.Id, cancellationToken), payment.Amount);
             payment.Method = PaymentMethod.MercadoPago;
             payment.Status = PaymentStatus.Confirmed;
             payment.VerifiedAt ??= DateTimeOffset.UtcNow;
             payment.UpdatedAt = DateTimeOffset.UtcNow;
 
             var due = payment.Amount - payment.AmountPaid;
-            var method = transaction.MethodId == "yape" ? "Yape" : "tarjeta";
+            var method = MethodName(transaction);
             var comment = due > 0
                 ? $"Adelanto pagado con {method} (Mercado Pago): {Money(transaction.Amount)}. Saldo pendiente: {Money(due)}."
                 : wasFirstPayment
@@ -275,6 +494,63 @@ namespace AuraNova.Infrastructure.Payments
             if (confirmsOrder)
                 await notificationService.NotifyAsync(order.Id, NotificationType.PaymentConfirmed);
         }
+
+        /// <summary>Lo cobrado y aprobado menos lo devuelto.</summary>
+        private Task<decimal> NetPaidAsync(Guid paymentId, CancellationToken cancellationToken) =>
+            db.PaymentTransactions
+                .Where(t => t.PaymentId == paymentId && t.ApprovedAt != null)
+                .SumAsync(t => t.Amount - t.RefundedAmount, cancellationToken);
+
+        /// <summary>Registra una devolución, recalcula lo pagado y lo deja en el historial del pedido.</summary>
+        private async Task RecordRefundAsync(Order order, Payment payment, PaymentTransaction transaction, decimal amount, string comment, CancellationToken cancellationToken)
+        {
+            var now = DateTimeOffset.UtcNow;
+            transaction.RefundedAmount += amount;
+            transaction.RefundedAt = now;
+            transaction.Status = transaction.RefundedAmount >= transaction.Amount ? "refunded" : "partially_refunded";
+            transaction.UpdatedAt = now;
+            await db.SaveChangesAsync(cancellationToken);
+
+            payment.AmountPaid = Math.Max(0, Math.Min(await NetPaidAsync(payment.Id, cancellationToken), payment.Amount));
+            payment.UpdatedAt = now;
+
+            var due = payment.Amount - payment.AmountPaid;
+            db.Set<OrderStatusHistory>().Add(new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                Status = order.Status,
+                Comment = order.Status == OrderStatus.Cancelled || due <= 0 ? comment : $"{comment} Ahora falta pagar {Money(due)}.",
+                AdminUserId = currentUser?.UserId,
+                AdminName = currentUser?.Name
+            });
+            await db.SaveChangesAsync(cancellationToken);
+
+            logger.LogInformation("Devolución de {Amount} en {OrderCode} (order {ExternalOrderId})", amount, order.OrderCode, transaction.ExternalOrderId);
+        }
+
+        private async Task RefundCancelledOrderPaymentAsync(Order order, Payment payment, PaymentTransaction transaction, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await gateway.RefundAsync(transaction.ExternalOrderId!, null, null,
+                    MercadoPagoGateway.IdempotencyKeyFor($"auto-refund:{transaction.Id}"), cancellationToken);
+                await RecordRefundAsync(order, payment, transaction, transaction.Amount,
+                    $"Se aprobó un pago de {Money(transaction.Amount)} con el pedido ya cancelado: se devolvió automáticamente.", cancellationToken);
+            }
+            catch (MercadoPagoGatewayException ex)
+            {
+                logger.LogError(ex, "No se pudo devolver el pago aprobado del pedido cancelado {OrderCode}", order.OrderCode);
+                db.Set<OrderStatusHistory>().Add(new OrderStatusHistory
+                {
+                    OrderId = order.Id,
+                    Status = order.Status,
+                    Comment = $"Se aprobó un pago de {Money(transaction.Amount)} con el pedido cancelado. Devuélvelo desde Pagos."
+                });
+                await db.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        private static string MethodName(PaymentTransaction transaction) => transaction.MethodId == "yape" ? "Yape" : "tarjeta";
 
         /// <summary>Fecha del último pedido pagado del mismo cliente (null si es su primera compra).</summary>
         private async Task<DateTimeOffset?> LastPurchaseAsync(Order order, CancellationToken cancellationToken) =>
@@ -316,6 +592,16 @@ namespace AuraNova.Infrastructure.Payments
                 "Este pago ya se había enviado. Revisa tu correo o el estado de tu pedido.",
             _ when detail.Contains("high_risk", StringComparison.OrdinalIgnoreCase) || detail.Contains("blacklist", StringComparison.OrdinalIgnoreCase) =>
                 "Mercado Pago no pudo aprobar este pago. Prueba con otro medio de pago.",
+            _ when detail.Contains("card_disabled", StringComparison.OrdinalIgnoreCase) =>
+                "Tu tarjeta está desactivada para compras por internet. Actívala con tu banco o usa otra.",
+            _ when detail.Contains("installments", StringComparison.OrdinalIgnoreCase) =>
+                "Tu tarjeta no acepta esa cantidad de cuotas. Elige otra cantidad o paga en una cuota.",
+            _ when detail.Contains("limit", StringComparison.OrdinalIgnoreCase) || detail.Contains("amount_rate", StringComparison.OrdinalIgnoreCase) =>
+                "Superaste el límite de tu tarjeta o de tu Yape. Prueba con otro medio o un monto menor.",
+            _ when detail.Contains("expired", StringComparison.OrdinalIgnoreCase) =>
+                "Tu tarjeta está vencida. Usa otra tarjeta o paga con Yape.",
+            _ when detail.Contains("otp", StringComparison.OrdinalIgnoreCase) =>
+                "El código de Yape no es válido o ya venció. Genera uno nuevo en tu app Yape.",
             _ => "El pago fue rechazado. Prueba con otro medio de pago."
         };
 

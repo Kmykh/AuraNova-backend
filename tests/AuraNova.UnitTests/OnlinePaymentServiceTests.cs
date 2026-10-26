@@ -34,6 +34,27 @@ namespace AuraNova.UnitTests
             public Task<GatewayOrder?> GetOrderAsync(string orderId, CancellationToken cancellationToken = default) =>
                 Task.FromResult(Orders.GetValueOrDefault(orderId));
 
+            public Task<GatewayOrder?> FindByExternalReferenceAsync(string externalReference, CancellationToken cancellationToken = default) =>
+                Task.FromResult(Orders.Values.FirstOrDefault(o => o.ExternalReference == externalReference));
+
+            public List<(string OrderId, string? PaymentId, decimal? Amount)> Refunds { get; } = new();
+
+            public Task<GatewayOrder> RefundAsync(string orderId, string? paymentId, decimal? amount, string idempotencyKey, CancellationToken cancellationToken = default)
+            {
+                Refunds.Add((orderId, paymentId, amount));
+                return Task.FromResult(Orders[orderId] with { Status = amount == null ? "refunded" : "processed" });
+            }
+
+            public List<string> Cancelled { get; } = new();
+
+            public Task<GatewayOrder> CancelAsync(string orderId, CancellationToken cancellationToken = default)
+            {
+                Cancelled.Add(orderId);
+                var order = Orders[orderId] with { Status = "canceled", StatusDetail = "canceled", Payments = [] };
+                Orders[orderId] = order;
+                return Task.FromResult(order);
+            }
+
             public static GatewayOrder Approved(GatewayCreateOrder r) =>
                 new($"ORD-{r.IdempotencyKey}", "processed", "accredited", r.ExternalReference, r.Amount,
                     [new GatewayPayment("PAY-1", "processed", "accredited", r.PaymentMethodId, r.PaymentMethodType)]);
@@ -218,6 +239,174 @@ namespace AuraNova.UnitTests
             Assert.Equal(60m, payment.AmountPaid);
             Assert.Equal(OrderStatus.PaymentConfirmed, (await db.Orders.FindAsync(order.Id))!.Status);
             Assert.Single(db.OrderStatusHistory.Where(h => h.Comment!.Contains("Mercado Pago")));
+        }
+
+        [Fact]
+        public async Task Refund_Partial_ThenRest_ReducesWhatWasPaid()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 100m);
+            var (service, gateway, _) = Build(db);
+            await service.PayAsync(order.Id, Card(payFull: true));
+            var transaction = await db.PaymentTransactions.SingleAsync();
+
+            var partial = await service.RefundAsync(order.Id, transaction.Id, new RefundOnlinePaymentRequest { Amount = 30m, Reason = "Faltó un globo" });
+
+            Assert.Equal(70m, partial.AmountPaid);
+            Assert.Equal(30m, partial.BalanceDue);
+            Assert.Equal(("PAY-1", 30m), (gateway.Refunds.Single().PaymentId, gateway.Refunds.Single().Amount));
+            Assert.Contains(db.OrderStatusHistory, h => h.Comment!.Contains("Devolución de S/ 30.00") && h.Comment.Contains("Faltó un globo"));
+
+            // Sin monto se devuelve lo que queda (70), como devolución total en Mercado Pago
+            var rest = await service.RefundAsync(order.Id, transaction.Id, new RefundOnlinePaymentRequest());
+            Assert.Equal(70m, rest.Refunded);
+            Assert.Equal(0m, rest.AmountPaid);
+            Assert.Null(gateway.Refunds[1].Amount);
+            Assert.Equal("refunded", (await db.PaymentTransactions.SingleAsync()).Status);
+
+            var ex = await Assert.ThrowsAsync<OnlinePaymentException>(() => service.RefundAsync(order.Id, transaction.Id, new RefundOnlinePaymentRequest()));
+            Assert.Contains("devuelto por completo", ex.Message);
+        }
+
+        [Fact]
+        public async Task Refund_MoreThanCharged_OrNotApproved_IsRejected()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 100m);
+            var (service, gateway, _) = Build(db);
+            await service.PayAsync(order.Id, Card(payFull: false));
+            var approved = await db.PaymentTransactions.SingleAsync();
+
+            var tooMuch = await Assert.ThrowsAsync<OnlinePaymentException>(() =>
+                service.RefundAsync(order.Id, approved.Id, new RefundOnlinePaymentRequest { Amount = 60m }));
+            Assert.Contains("como máximo S/ 50.00", tooMuch.Message);
+
+            gateway.OnCreate = FakeGateway.Failed;
+            await service.PayAsync(order.Id, Card(payFull: true, token: "tok-2"));
+            var rejected = await db.PaymentTransactions.SingleAsync(t => t.Id != approved.Id);
+            await Assert.ThrowsAsync<OnlinePaymentException>(() => service.RefundAsync(order.Id, rejected.Id, new RefundOnlinePaymentRequest()));
+            Assert.Empty(gateway.Refunds);
+        }
+
+        [Fact]
+        public async Task PaymentApprovedAfterOrderWasCancelled_IsRefundedAutomatically()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 80m);
+            var (service, gateway, notifications) = Build(db);
+            gateway.OnCreate = FakeGateway.Processing;
+            await service.PayAsync(order.Id, Card(payFull: true));
+
+            order.Status = OrderStatus.Cancelled;
+            await db.SaveChangesAsync();
+            var mpOrderId = gateway.Orders.Keys.Single();
+            gateway.Orders[mpOrderId] = FakeGateway.Approved(gateway.Created.Single()) with { Id = mpOrderId };
+
+            await service.HandleOrderNotificationAsync(mpOrderId);
+
+            Assert.Equal(mpOrderId, gateway.Refunds.Single().OrderId);
+            Assert.Equal(0m, (await db.Payments.SingleAsync()).AmountPaid);
+            Assert.Equal(OrderStatus.Cancelled, (await db.Orders.FindAsync(order.Id))!.Status);
+            Assert.Contains(db.OrderStatusHistory, h => h.Comment!.Contains("se devolvió automáticamente"));
+            notifications.Verify(n => n.NotifyAsync(order.Id, NotificationType.PaymentConfirmed, null), Times.Never);
+        }
+
+        [Fact]
+        public async Task RefundMadeInMercadoPagoPanel_IsSyncedByWebhook()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 100m);
+            var (service, gateway, _) = Build(db);
+            await service.PayAsync(order.Id, Card(payFull: true));
+
+            var mpOrderId = gateway.Orders.Keys.Single();
+            gateway.Orders[mpOrderId] = gateway.Orders[mpOrderId] with { Status = "refunded", StatusDetail = "refunded", Payments = [] };
+            await service.HandleOrderNotificationAsync(mpOrderId);
+            await service.HandleOrderNotificationAsync(mpOrderId);
+
+            Assert.Equal(0m, (await db.Payments.SingleAsync()).AmountPaid);
+            Assert.Equal(100m, (await db.PaymentTransactions.SingleAsync()).RefundedAmount);
+        }
+
+        [Fact]
+        public async Task Reconcile_ConfirmsPaymentsWhoseWebhookNeverArrived()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 60m);
+            var (service, gateway, _) = Build(db);
+            gateway.OnCreate = FakeGateway.Processing;
+            await service.PayAsync(order.Id, Card(payFull: true));
+
+            var transaction = await db.PaymentTransactions.SingleAsync();
+            transaction.CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-10);
+            await db.SaveChangesAsync();
+            var mpOrderId = gateway.Orders.Keys.Single();
+            gateway.Orders[mpOrderId] = FakeGateway.Approved(gateway.Created.Single()) with { Id = mpOrderId };
+
+            Assert.Equal(1, await service.ReconcilePendingAsync());
+            Assert.Equal(60m, (await db.Payments.SingleAsync()).AmountPaid);
+            Assert.Equal(OrderStatus.PaymentConfirmed, (await db.Orders.FindAsync(order.Id))!.Status);
+            Assert.Equal(0, await service.ReconcilePendingAsync());
+        }
+
+        [Fact]
+        public async Task Reconcile_FindsByReference_WhenTheCreateResponseWasLost()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 40m);
+            var (service, gateway, _) = Build(db);
+
+            // Mercado Pago cobró, pero el servidor nunca recibió la respuesta (corte de red)
+            var transaction = new PaymentTransaction
+            {
+                PaymentId = (await db.Payments.SingleAsync()).Id, OrderId = order.Id, MethodId = "visa", MethodType = "credit_card",
+                Amount = 40m, Status = "error", CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-5)
+            };
+            db.PaymentTransactions.Add(transaction);
+            await db.SaveChangesAsync();
+            gateway.Orders["ORD-LOST"] = new GatewayOrder("ORD-LOST", "processed", "accredited", transaction.Id.ToString("N"), 40m,
+                [new GatewayPayment("PAY-9", "processed", "accredited", "visa", "credit_card")]);
+
+            await service.ReconcilePendingAsync();
+
+            Assert.Equal("ORD-LOST", (await db.PaymentTransactions.SingleAsync()).ExternalOrderId);
+            Assert.Equal(40m, (await db.Payments.SingleAsync()).AmountPaid);
+        }
+
+        [Fact]
+        public async Task CancelPending_OnlyVoidsOrdersWaitingForTheCustomer()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 60m);
+            var (service, gateway, _) = Build(db);
+            gateway.OnCreate = r => FakeGateway.Processing(r) with { Status = "action_required" };
+            await service.PayAsync(order.Id, Card(payFull: true));
+
+            await service.CancelPendingAsync(order.Id);
+
+            Assert.Single(gateway.Cancelled);
+            Assert.Equal("canceled", (await db.PaymentTransactions.SingleAsync()).Status);
+        }
+
+        [Fact]
+        public async Task Report_SumsCollectedRefundedAndNet()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 100m);
+            var (service, gateway, _) = Build(db);
+            await service.PayAsync(order.Id, Card(payFull: false));
+            gateway.OnCreate = FakeGateway.Failed;
+            await service.PayAsync(order.Id, Card(payFull: true, token: "tok-2"));
+            var approved = await db.PaymentTransactions.SingleAsync(t => t.ApprovedAt != null);
+            await service.RefundAsync(order.Id, approved.Id, new RefundOnlinePaymentRequest { Amount = 10m });
+
+            var report = await service.GetReportAsync(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddMinutes(1));
+
+            Assert.Equal(50m, report.Collected);
+            Assert.Equal(10m, report.Refunded);
+            Assert.Equal(40m, report.Net);
+            Assert.Equal((1, 1, 0), (report.ApprovedCount, report.RejectedCount, report.PendingCount));
+            Assert.All(report.Rows, r => Assert.Equal("AN-1001", r.OrderCode));
         }
 
         [Fact]

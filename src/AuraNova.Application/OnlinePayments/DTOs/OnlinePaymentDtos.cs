@@ -61,4 +61,65 @@ namespace AuraNova.Application.OnlinePayments.DTOs
 
     /// <summary>Error de validación que el cliente puede leer (monto, estado del pedido, datos faltantes).</summary>
     public class OnlinePaymentException(string message) : Exception(message);
+
+    /// <summary>Devolución desde el panel. Sin monto se devuelve todo lo que queda de ese cobro.</summary>
+    public class RefundOnlinePaymentRequest
+    {
+        [Range(0.01, 100000)]
+        public decimal? Amount { get; set; }
+
+        [MaxLength(250)]
+        public string? Reason { get; set; }
+    }
+
+    public class RefundOnlinePaymentResult
+    {
+        public decimal Refunded { get; set; }
+        public decimal AmountPaid { get; set; }
+        public decimal BalanceDue { get; set; }
+        public string Message { get; set; } = null!;
+    }
+
+    /// <summary>Un cobro en línea para el reporte de pagos del panel.</summary>
+    public class OnlinePaymentReportRow
+    {
+        public Guid Id { get; set; }
+        public Guid OrderId { get; set; }
+        public string OrderCode { get; set; } = null!;
+        public string? CustomerName { get; set; }
+        public string MethodId { get; set; } = null!;
+        public string? MethodType { get; set; }
+        public decimal Amount { get; set; }
+        public decimal RefundedAmount { get; set; }
+        public bool IsDeposit { get; set; }
+        public string Status { get; set; } = null!;
+        public string? StatusDetail { get; set; }
+        public bool Approved { get; set; }
+        public string? ExternalOrderId { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset? ApprovedAt { get; set; }
+    }
+
+    public class OnlinePaymentReport
+    {
+        public DateTimeOffset From { get; set; }
+        public DateTimeOffset To { get; set; }
+        /// <summary>Suma de cobros aprobados.</summary>
+        public decimal Collected { get; set; }
+        public decimal Refunded { get; set; }
+        public decimal Net { get; set; }
+        public int ApprovedCount { get; set; }
+        public int RejectedCount { get; set; }
+        public int PendingCount { get; set; }
+        public IReadOnlyList<OnlinePaymentReportRow> Rows { get; set; } = [];
+    }
+
+    public class PaymentWebhookEventResponse
+    {
+        public DateTimeOffset ReceivedAt { get; set; }
+        public string? Topic { get; set; }
+        public string? ResourceId { get; set; }
+        public string Result { get; set; } = null!;
+        public string? Detail { get; set; }
+    }
 }

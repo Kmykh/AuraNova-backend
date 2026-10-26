@@ -51,11 +51,28 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
             builder.Property(t => t.Amount).HasPrecision(18, 2).IsRequired();
             builder.Property(t => t.Status).IsRequired().HasMaxLength(40);
             builder.Property(t => t.StatusDetail).HasMaxLength(100);
+            builder.Property(t => t.RefundedAmount).HasPrecision(18, 2).HasDefaultValue(0m);
             builder.Property(t => t.CreatedAt).IsRequired();
 
             // Una order de Mercado Pago corresponde a un solo cobro nuestro (el webhook la busca por aquí)
             builder.HasIndex(t => t.ExternalOrderId).IsUnique().HasFilter("\"ExternalOrderId\" IS NOT NULL");
             builder.HasIndex(t => t.OrderId);
+            // La conciliación busca cobros sin confirmar
+            builder.HasIndex(t => new { t.Status, t.CreatedAt });
+        }
+    }
+
+    public class PaymentWebhookEventConfiguration : IEntityTypeConfiguration<PaymentWebhookEvent>
+    {
+        public void Configure(EntityTypeBuilder<PaymentWebhookEvent> builder)
+        {
+            builder.ToTable("PaymentWebhookEvents");
+            builder.HasKey(e => e.Id);
+            builder.Property(e => e.Topic).HasMaxLength(40);
+            builder.Property(e => e.ResourceId).HasMaxLength(100);
+            builder.Property(e => e.Result).IsRequired().HasMaxLength(30);
+            builder.Property(e => e.Detail).HasMaxLength(250);
+            builder.HasIndex(e => e.ReceivedAt);
         }
     }
 }

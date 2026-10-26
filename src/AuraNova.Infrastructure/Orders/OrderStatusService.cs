@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using AuraNova.Application.Auth.Interfaces;
 using AuraNova.Application.Notifications.Interfaces;
+using AuraNova.Application.OnlinePayments.Interfaces;
 using AuraNova.Application.Orders;
 using AuraNova.Application.Orders.DTOs;
 using AuraNova.Application.Orders.Interfaces;
@@ -22,19 +23,22 @@ namespace AuraNova.Infrastructure.Orders
         private readonly INotificationService _notificationService;
         private readonly ICurrentUserService _currentUserService;
         private readonly ILogger<OrderStatusService> _logger;
+        private readonly IOnlinePaymentService? _onlinePayments;
 
         public OrderStatusService(
             AppDbContext db,
             IOrderStatusTransitionService transitions,
             INotificationService notificationService,
             ICurrentUserService currentUserService,
-            ILogger<OrderStatusService> logger)
+            ILogger<OrderStatusService> logger,
+            IOnlinePaymentService? onlinePayments = null)
         {
             _db = db;
             _transitions = transitions;
             _notificationService = notificationService;
             _currentUserService = currentUserService;
             _logger = logger;
+            _onlinePayments = onlinePayments;
         }
 
         public async Task<OrderStatusChangeResponse> ChangeStatusAsync(Guid orderId, OrderStatus newStatus, string? comment)
@@ -107,6 +111,19 @@ namespace AuraNova.Infrastructure.Orders
                     await transaction.CommitAsync();
 
                 _logger.LogInformation("Pedido {OrderCode} cambió de {OldStatus} a {NewStatus}", order.OrderCode, oldStatus, newStatus);
+
+                // Un pago que aún espera al cliente ya no debe poder completarse
+                if (newStatus == OrderStatus.Cancelled && _onlinePayments != null)
+                {
+                    try
+                    {
+                        await _onlinePayments.CancelPendingAsync(order.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "No se pudieron anular los pagos pendientes del pedido {OrderCode}", order.OrderCode);
+                    }
+                }
 
                 // --- Trigger Notification ---
                 var notificationType = MapStatusToNotification(newStatus);
