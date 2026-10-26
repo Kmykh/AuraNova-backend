@@ -30,7 +30,9 @@ namespace AuraNova.Infrastructure.Notifications.Email
 
             try
             {
-                await sender.SendAsync(notification.Recipient, subject, html, notification.Message, cancellationToken);
+                // La clave cambia en cada reenvío manual (UpdatedAt) pero no en los reintentos automáticos
+                var idempotencyKey = $"{notification.Id:N}-{(notification.UpdatedAt ?? notification.CreatedAt).ToUnixTimeMilliseconds()}";
+                await sender.SendAsync(notification.Recipient, subject, html, notification.Message, idempotencyKey, cancellationToken);
                 notification.Status = NotificationStatus.Sent;
                 notification.SentAt = DateTimeOffset.UtcNow;
                 notification.ErrorMessage = null;

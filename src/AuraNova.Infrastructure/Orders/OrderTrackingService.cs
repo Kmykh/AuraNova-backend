@@ -64,6 +64,7 @@ namespace AuraNova.Infrastructure.Orders
             {
                 OrderId = order.Id,
                 OrderCode = order.OrderCode,
+                TrackingCode = order.TrackingToken,
                 Status = order.Status.ToString(),
                 StatusLabel = OrderStatusLabels.GetLabel(order.Status),
                 DeliveryType = order.DeliveryType.ToString(),

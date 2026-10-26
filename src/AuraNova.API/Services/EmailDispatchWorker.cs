@@ -27,7 +27,10 @@ namespace AuraNova.API.Services
             }
         }
 
-        /// <summary>Correos que no alcanzaron a salir antes de un reinicio del servidor (últimas 24 h).</summary>
+        /// <summary>
+        /// Correos que no alcanzaron a salir antes de un reinicio del servidor, y los que fallaron
+        /// (p. ej. por una configuración que ya se corrigió), de las últimas 24 h.
+        /// </summary>
         private async Task RequeuePendingAsync(CancellationToken cancellationToken)
         {
             try
@@ -36,7 +39,8 @@ namespace AuraNova.API.Services
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var since = DateTimeOffset.UtcNow.AddHours(-24);
                 var pending = await db.Set<Notification>()
-                    .Where(n => n.Channel == NotificationChannel.Email && n.Status == NotificationStatus.Generated && n.CreatedAt > since)
+                    .Where(n => n.Channel == NotificationChannel.Email && n.CreatedAt > since &&
+                                (n.Status == NotificationStatus.Generated || n.Status == NotificationStatus.Failed))
                     .Select(n => n.Id)
                     .ToListAsync(cancellationToken);
                 pending.ForEach(queue.Enqueue);
