@@ -58,8 +58,6 @@ namespace AuraNova.Infrastructure.BusinessSettings
                 throw new ArgumentException("BusinessName is required.");
             if (string.IsNullOrWhiteSpace(request.WhatsAppNumber))
                 throw new ArgumentException("WhatsAppNumber is required.");
-            if (string.IsNullOrWhiteSpace(request.YapeHolderName))
-                throw new ArgumentException("YapeHolderName is required.");
 
             // Normalize WhatsApp
             var normalizedPhone = new string(request.WhatsAppNumber.Where(char.IsDigit).ToArray());
@@ -72,7 +70,9 @@ namespace AuraNova.Infrastructure.BusinessSettings
             var settings = await GetOrCreateSettingsAsync();
             settings.BusinessName = request.BusinessName.Trim();
             settings.WhatsAppNumber = normalizedPhone;
-            settings.YapeHolderName = request.YapeHolderName.Trim();
+            // Solo del cobro antiguo por QR de Yape: ya no se pide en el panel y, si no llega, se mantiene
+            if (!string.IsNullOrWhiteSpace(request.YapeHolderName))
+                settings.YapeHolderName = request.YapeHolderName.Trim();
             settings.TikTokUsername = request.TikTokUsername?.Trim();
             settings.UpdatedAt = DateTimeOffset.UtcNow;
 
