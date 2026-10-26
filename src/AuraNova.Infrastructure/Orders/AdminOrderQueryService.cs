@@ -187,7 +187,7 @@ namespace AuraNova.Infrastructure.Orders
                 .Include(o => o.DeliveryZone)
                 .Include(o => o.MeetingPoint)
                 .Include(o => o.Quote)
-                .Include(o => o.Payment)
+                .Include(o => o.Payment!).ThenInclude(p => p.Transactions)
                 .Include(o => o.StatusHistory)
                 .Include(o => o.Notifications)
                 .Include(o => o.ReferenceImages)
@@ -304,9 +304,26 @@ namespace AuraNova.Infrastructure.Orders
                     PaymentStatus = order.Payment.Status.ToString(),
                     PaymentMethod = order.Payment.Method.ToString(),
                     Amount = order.Payment.Amount,
+                    AmountPaid = order.Payment.AmountPaid,
+                    BalanceDue = Math.Max(0, order.Payment.Amount - order.Payment.AmountPaid),
                     EvidenceUrl = FileUrl(order.Payment.EvidenceUrl),
                     CreatedAt = order.Payment.CreatedAt,
-                    VerifiedAt = order.Payment.VerifiedAt
+                    VerifiedAt = order.Payment.VerifiedAt,
+                    Transactions = (order.Payment.Transactions ?? [])
+                        .Where(t => t.Status != "created")
+                        .OrderByDescending(t => t.CreatedAt)
+                        .Select(t => new AdminPaymentTransaction
+                        {
+                            MethodId = t.MethodId,
+                            MethodType = t.MethodType,
+                            Amount = t.Amount,
+                            IsDeposit = t.IsDeposit,
+                            Status = t.Status,
+                            StatusDetail = t.StatusDetail,
+                            Approved = t.ApprovedAt != null,
+                            ExternalOrderId = t.ExternalOrderId,
+                            CreatedAt = t.CreatedAt
+                        }).ToList()
                 };
             }
 
