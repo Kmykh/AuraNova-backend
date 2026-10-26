@@ -161,6 +161,26 @@ namespace AuraNova.UnitTests
             Assert.Contains("domain is not verified", error.Message);
         }
 
+        [Fact]
+        public async Task Settings_CleanPastedValues_AndBadKeyFailsWithoutLeakingIt()
+        {
+            var settings = new EmailSettings { ApiKey = " re_abc123\n", FromAddress = " pedidos@auranova.test ", FromName = "\"Aura Nova\"" };
+            Assert.False(settings.ApiKeyLooksValid);
+            settings.Normalize();
+            Assert.Equal("re_abc123", settings.ApiKey);
+            Assert.Equal("pedidos@auranova.test", settings.FromAddress);
+            Assert.Equal("Aura Nova", settings.FromName);
+            Assert.True(settings.ApiKeyLooksValid);
+
+            var handler = new CaptureHandler(System.Net.HttpStatusCode.OK, "{}");
+            var badKey = Microsoft.Extensions.Options.Options.Create(new EmailSettings { ApiKey = "sk_secreta", FromAddress = "pedidos@auranova.test" });
+            var sender = new ResendEmailSender(new HttpClient(handler) { BaseAddress = new Uri("https://api.resend.com/") }, badKey);
+            var error = await Assert.ThrowsAsync<EmailSendException>(() => sender.SendAsync("maria@example.com", "A", "<p>B</p>", "B"));
+            Assert.Contains("re_", error.Message);
+            Assert.DoesNotContain("sk_secreta", error.Message);
+            Assert.Null(handler.Request);
+        }
+
         private sealed class CaptureHandler(System.Net.HttpStatusCode status, string response) : HttpMessageHandler
         {
             public HttpRequestMessage? Request { get; private set; }
