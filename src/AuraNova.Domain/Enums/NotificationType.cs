@@ -11,6 +11,8 @@ namespace AuraNova.Domain.Enums
         OrderReady,
         OrderShipped,
         OrderDelivered,
-        OrderCancelled
+        OrderCancelled,
+        /// <summary>El cliente pagó el saldo (después del adelanto): el pedido queda pagado por completo.</summary>
+        BalancePaid
     }
 }

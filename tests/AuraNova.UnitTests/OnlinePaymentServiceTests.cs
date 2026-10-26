@@ -156,6 +156,21 @@ namespace AuraNova.UnitTests
         }
 
         [Fact]
+        public async Task PayingTheBalance_NotifiesTheCustomer_OrderFullyPaid()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 100m);
+            var (service, _, notifications) = Build(db);
+            await service.PayAsync(order.Id, Card(payFull: false, token: "tok-1"));
+
+            var result = await service.PayAsync(order.Id, Card(payFull: false, token: "tok-2"));
+
+            Assert.Equal("approved", result.Status);
+            notifications.Verify(n => n.NotifyAsync(order.Id, NotificationType.PaymentConfirmed, null), Times.Once);
+            notifications.Verify(n => n.NotifyAsync(order.Id, NotificationType.BalancePaid, null), Times.Once);
+        }
+
+        [Fact]
         public async Task FullPayment_ChargesTotal()
         {
             using var db = GetDb();

@@ -82,6 +82,21 @@ namespace AuraNova.UnitTests
         }
 
         [Fact]
+        public async Task HandedToAgency_NotifiesTheCustomer()
+        {
+            using var db = GetDb();
+            var order = await SeedReadyOrder(db, DeliveryType.NationalShipping, paid: 100m);
+            var notifications = new Mock<INotificationService>();
+            var service = new OrderService(db, notifications.Object, new NullLogger<OrderService>(),
+                new OrderStatusTransitionService(), new Mock<ICurrentUserService>().Object, new Mock<IProductPriceResolver>().Object);
+
+            await service.DeliverToAgencyAsync(order.Id, "Shalom", "SH-123", null);
+
+            Assert.Equal(OrderStatus.DeliveredToAgency, (await db.Orders.FindAsync(order.Id))!.Status);
+            notifications.Verify(n => n.NotifyAsync(order.Id, NotificationType.OrderShipped, null), Times.Once);
+        }
+
+        [Fact]
         public async Task MarkAsReady_SendsReadyNotification()
         {
             using var db = GetDb();

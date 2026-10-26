@@ -725,6 +725,9 @@ namespace AuraNova.Infrastructure.Orders
             });
 
             await _db.SaveChangesAsync();
+
+            // El cliente necesita la agencia y su código para recoger el paquete
+            await _notificationService.NotifyAsync(order.Id, NotificationType.OrderShipped);
         }
 
         public async Task CancelAsync(Guid id, string reason)

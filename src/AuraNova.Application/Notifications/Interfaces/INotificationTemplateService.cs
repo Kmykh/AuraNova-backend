@@ -8,6 +8,7 @@ namespace AuraNova.Application.Notifications.Interfaces
         Task<string> BuildQuoteReadyMessageAsync(Order order);
         Task<string> BuildPaymentReportedMessageAsync(Order order);
         Task<string> BuildPaymentConfirmedMessageAsync(Order order);
+        Task<string> BuildBalancePaidMessageAsync(Order order);
         Task<string> BuildPaymentRejectedMessageAsync(Order order, string? reason);
         Task<string> BuildPreparingMessageAsync(Order order);
         Task<string> BuildReadyMessageAsync(Order order);

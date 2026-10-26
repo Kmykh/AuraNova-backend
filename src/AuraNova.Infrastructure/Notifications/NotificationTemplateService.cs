@@ -170,6 +170,27 @@ namespace AuraNova.Infrastructure.Notifications
                 """.Replace("                ", "");
         }
 
+        public async Task<string> BuildBalancePaidMessageAsync(Order order)
+        {
+            var businessName = await GetBusinessNameAsync();
+            var next = order.Status == OrderStatus.Ready
+                ? "Tu pedido ya está listo: te escribimos para coordinar la entrega."
+                : "Seguimos preparando tu pedido y te avisamos cuando esté listo.";
+            return $"""
+                Hola {GetName(order)}
+                
+                Recibimos el pago de tu saldo. Tu pedido {order.OrderCode} está pagado por completo (S/ {order.Payment?.AmountPaid ?? 0m:F2}).
+                
+                {next}
+                
+                Pedido: {order.OrderCode}
+                Código de seguimiento: {order.TrackingToken}
+                Síguelo aquí: {TrackingUrl(order)}
+                
+                Gracias por elegir {businessName}
+                """.Replace("                ", "");
+        }
+
         public async Task<string> BuildPaymentRejectedMessageAsync(Order order, string? reason)
         {
             await Task.CompletedTask;
@@ -235,10 +256,16 @@ namespace AuraNova.Infrastructure.Notifications
         public async Task<string> BuildShippedMessageAsync(Order order)
         {
             await Task.CompletedTask;
+            var agencyLines = string.IsNullOrWhiteSpace(order.ShippingProvider)
+                ? ""
+                : $"Lo dejamos en {order.ShippingProvider} con destino a {order.District ?? order.Province ?? "tu ciudad"}." +
+                  (string.IsNullOrWhiteSpace(order.ShippingTrackingCode) ? "" : $"\nCódigo de {order.ShippingProvider}: {order.ShippingTrackingCode}") +
+                  "\nRecógelo con tu DNI en la agencia; el envío se paga al recoger.\n";
             return $"""
                 Hola {GetName(order)}
                 
                 Tu pedido {order.OrderCode} ya fue enviado.
+                {agencyLines}
                 
                 Pedido: {order.OrderCode}
                 Código de seguimiento: {order.TrackingToken}

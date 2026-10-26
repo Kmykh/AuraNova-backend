@@ -153,6 +153,7 @@ namespace AuraNova.Infrastructure.Notifications
             NotificationType.QuoteReady => $"Tu cotización del pedido {order.OrderCode} está lista",
             NotificationType.PaymentReported => $"Recibimos tu comprobante · {order.OrderCode}",
             NotificationType.PaymentConfirmed => $"¡Pago confirmado! Pedido {order.OrderCode}",
+            NotificationType.BalancePaid => $"¡Pedido pagado por completo! {order.OrderCode}",
             NotificationType.PaymentRejected => $"No pudimos validar tu pago · {order.OrderCode}",
             NotificationType.OrderPreparing => $"Tu pedido {order.OrderCode} está en el taller",
             NotificationType.OrderReady => BalanceDue(order) > 0
@@ -209,6 +210,7 @@ namespace AuraNova.Infrastructure.Notifications
                 NotificationType.QuoteReady => await _templateService.BuildQuoteReadyMessageAsync(order),
                 NotificationType.PaymentReported => await _templateService.BuildPaymentReportedMessageAsync(order),
                 NotificationType.PaymentConfirmed => await _templateService.BuildPaymentConfirmedMessageAsync(order),
+                NotificationType.BalancePaid => await _templateService.BuildBalancePaidMessageAsync(order),
                 NotificationType.PaymentRejected => await _templateService.BuildPaymentRejectedMessageAsync(order, reason),
                 NotificationType.OrderPreparing => await _templateService.BuildPreparingMessageAsync(order),
                 NotificationType.OrderReady => await _templateService.BuildReadyMessageAsync(order),

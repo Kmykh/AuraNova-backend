@@ -155,7 +155,8 @@ namespace AuraNova.Infrastructure.Payments
 
             await ApplyAsync(order, payment, transaction, result, cancellationToken);
 
-            var paid = payment.AmountPaid;
+            // Suma desde la BD: si el aviso de Mercado Pago aún está guardando el pago, el monto igual sale correcto
+            var paid = Math.Min(await NetPaidAsync(payment.Id, cancellationToken), payment.Amount);
             var due = payment.Amount - paid;
             return new OnlinePaymentResult
             {
@@ -436,7 +437,14 @@ namespace AuraNova.Infrastructure.Payments
                     .Where(t => t.Id == transaction.Id && t.ApprovedAt == null)
                     .ExecuteUpdateAsync(setter => setter.SetProperty(t => t.ApprovedAt, approvedAt), cancellationToken) > 0;
                 if (!claimed)
+                {
+                    // El aviso de Mercado Pago (webhook) llegó antes que la respuesta y ya registró este pago:
+                    // se toma lo guardado para responderle al cliente "aprobado" y no "en proceso"
+                    await db.Entry(transaction).ReloadAsync(cancellationToken);
+                    await db.Entry(payment).ReloadAsync(cancellationToken);
+                    await db.Entry(order).ReloadAsync(cancellationToken);
                     return;
+                }
 
                 transaction.ApprovedAt = approvedAt;
                 db.Entry(transaction).Property(t => t.ApprovedAt).IsModified = false;
@@ -490,6 +498,8 @@ namespace AuraNova.Infrastructure.Payments
 
             if (confirmsOrder)
                 await notificationService.NotifyAsync(order.Id, NotificationType.PaymentConfirmed);
+            else if (!wasFirstPayment && due <= 0)
+                await notificationService.NotifyAsync(order.Id, NotificationType.BalancePaid);
         }
 
         /// <summary>Lo cobrado y aprobado menos lo devuelto.</summary>
