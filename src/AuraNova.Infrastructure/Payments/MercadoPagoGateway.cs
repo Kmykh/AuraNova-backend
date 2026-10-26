@@ -15,6 +15,12 @@ namespace AuraNova.Infrastructure.Payments
         /// <summary>Access Token (de prueba o de producción). Solo backend: variable MercadoPago__AccessToken.</summary>
         public string AccessToken { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Public Key de la misma aplicación (MercadoPago__PublicKey). No es secreta: la web la pide al backend,
+        /// así ambas claves viven juntas y nunca quedan mezcladas una de prueba con una de producción.
+        /// </summary>
+        public string PublicKey { get; set; } = string.Empty;
+
         /// <summary>Firma secreta de "Configuración de Webhooks" (MercadoPago__WebhookSecret).</summary>
         public string WebhookSecret { get; set; } = string.Empty;
 
