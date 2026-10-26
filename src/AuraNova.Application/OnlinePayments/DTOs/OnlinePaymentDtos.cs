@@ -42,6 +42,10 @@ namespace AuraNova.Application.OnlinePayments.DTOs
         /// <summary>Yape: celular asociado (9 dígitos).</summary>
         [MaxLength(15)]
         public string? Phone { get; set; }
+
+        /// <summary>Identificador del dispositivo que genera security.js de Mercado Pago (MP_DEVICE_SESSION_ID).</summary>
+        [MaxLength(500), RegularExpression("^[A-Za-z0-9._:-]+$")]
+        public string? DeviceId { get; set; }
     }
 
     public class OnlinePaymentResult

@@ -17,7 +17,18 @@ namespace AuraNova.Infrastructure.Payments
 
         /// <summary>Firma secreta de "Configuración de Webhooks" (MercadoPago__WebhookSecret).</summary>
         public string WebhookSecret { get; set; } = string.Empty;
+
+        /// <summary>Nombre que ve el cliente en el estado de cuenta de su tarjeta.</summary>
+        public string StatementDescriptor { get; set; } = "AURANOVA";
     }
+
+    public record GatewayItem(
+        string ExternalCode, string Title, string? Description, string CategoryId, int Quantity, decimal UnitPrice, string? PictureUrl);
+
+    public record GatewayAddress(string StreetName, string? City, string? State, string? Complement);
+
+    /// <summary>Historial del comprador en la tienda (ayuda al antifraude a reconocer clientes frecuentes).</summary>
+    public record GatewayBuyerHistory(DateTimeOffset RegisteredAt, DateTimeOffset? LastPurchaseAt, bool LocalPickup);
 
     /// <summary>Lo que enviamos para crear una order de Mercado Pago con un solo pago.</summary>
     public record GatewayCreateOrder(
@@ -32,7 +43,14 @@ namespace AuraNova.Infrastructure.Payments
         string PaymentMethodType,
         string Token,
         int? Installments,
-        string IdempotencyKey);
+        string IdempotencyKey,
+        string? PayerFirstName = null,
+        string? PayerLastName = null,
+        GatewayAddress? PayerAddress = null,
+        IReadOnlyList<GatewayItem>? Items = null,
+        GatewayAddress? ShipmentAddress = null,
+        GatewayBuyerHistory? History = null,
+        string? DeviceId = null);
 
     public record GatewayPayment(string? Id, string? Status, string? StatusDetail, string? MethodId, string? MethodType);
 
@@ -73,7 +91,7 @@ namespace AuraNova.Infrastructure.Payments
 
         public async Task<GatewayOrder> CreateOrderAsync(GatewayCreateOrder request, CancellationToken cancellationToken = default)
         {
-            var amount = request.Amount.ToString("0.00", CultureInfo.InvariantCulture);
+            var amount = Money(request.Amount);
             var isYape = request.PaymentMethodId == "yape";
 
             var body = new OrderCreateRequest
@@ -83,9 +101,31 @@ namespace AuraNova.Infrastructure.Payments
                 ExternalReference = request.ExternalReference,
                 TotalAmount = amount,
                 Description = request.Description,
+                Items = request.Items?.Select(i => new OrderItemsRequest
+                {
+                    ExternalCode = i.ExternalCode,
+                    Title = i.Title,
+                    Description = i.Description,
+                    CategoryId = i.CategoryId,
+                    Quantity = i.Quantity,
+                    UnitPrice = Money(i.UnitPrice),
+                    PictureUrl = i.PictureUrl
+                }).ToList(),
+                Shipment = request.ShipmentAddress == null ? null : new OrderShipmentRequest { Address = Address(request.ShipmentAddress) },
+                AdditionalInfo = request.History == null ? null : new OrderAdditionalInfoRequest
+                {
+                    RegistrationDate = Date(request.History.RegisteredAt),
+                    IsFirstPurchaseOnline = request.History.LastPurchaseAt == null,
+                    LastPurchase = request.History.LastPurchaseAt is { } last ? Date(last) : null,
+                    LocalPickup = request.History.LocalPickup,
+                    Express = false
+                },
                 Payer = new OrderPayerRequest
                 {
                     Email = request.PayerEmail,
+                    FirstName = request.PayerFirstName,
+                    LastName = request.PayerLastName,
+                    Address = request.PayerAddress == null ? null : Address(request.PayerAddress),
                     EntityType = isYape ? "individual" : null,
                     Identification = string.IsNullOrWhiteSpace(request.IdentificationType)
                         ? null
@@ -110,7 +150,10 @@ namespace AuraNova.Infrastructure.Payments
                                 Id = request.PaymentMethodId,
                                 Type = request.PaymentMethodType,
                                 Token = request.Token,
-                                Installments = isYape ? null : request.Installments ?? 1
+                                Installments = isYape ? null : request.Installments ?? 1,
+                                StatementDescriptor = isYape || string.IsNullOrWhiteSpace(_settings.StatementDescriptor)
+                                    ? null
+                                    : _settings.StatementDescriptor
                             }
                         }
                     }
@@ -119,7 +162,12 @@ namespace AuraNova.Infrastructure.Payments
 
             try
             {
-                var order = await _client.CreateAsync(body, Options(request.IdempotencyKey), cancellationToken);
+                var options = Options(request.IdempotencyKey);
+                // Identificador del dispositivo (security.js): el antifraude reconoce al comprador y aprueba más pagos
+                if (!string.IsNullOrWhiteSpace(request.DeviceId))
+                    options.CustomHeaders.Add("X-meli-session-id", request.DeviceId);
+
+                var order = await _client.CreateAsync(body, options, cancellationToken);
                 return Map(order);
             }
             catch (MercadoPagoApiException ex)
@@ -212,6 +260,19 @@ namespace AuraNova.Infrastructure.Payments
                 return null;
             }
         }
+
+        private static string Money(decimal value) => value.ToString("0.00", CultureInfo.InvariantCulture);
+
+        private static string Date(DateTimeOffset value) =>
+            value.ToOffset(TimeSpan.FromHours(-5)).ToString("yyyy-MM-dd'T'HH:mm:ss.fffzzz", CultureInfo.InvariantCulture);
+
+        private static OrderAddressRequest Address(GatewayAddress address) => new()
+        {
+            StreetName = address.StreetName,
+            City = address.City,
+            State = address.State,
+            Complement = address.Complement
+        };
 
         private static decimal ParseAmount(string? value) =>
             decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) ? amount : 0m;

@@ -3,6 +3,7 @@ using AuraNova.Application.Notifications.Interfaces;
 using AuraNova.Application.OnlinePayments.DTOs;
 using AuraNova.Application.OnlinePayments.Interfaces;
 using AuraNova.Application.Orders;
+using AuraNova.Application.Storage.Interfaces;
 using AuraNova.Domain.Entities;
 using AuraNova.Domain.Enums;
 using AuraNova.Infrastructure.Persistence;
@@ -19,7 +20,8 @@ namespace AuraNova.Infrastructure.Payments
         AppDbContext db,
         IMercadoPagoGateway gateway,
         INotificationService notificationService,
-        ILogger<OnlinePaymentService> logger) : IOnlinePaymentService
+        ILogger<OnlinePaymentService> logger,
+        IStorageUrlResolver? storageUrls = null) : IOnlinePaymentService
     {
         // Un cobro "en proceso" bloquea otro intento durante este tiempo (evita pagar dos veces)
         private static readonly TimeSpan PendingLock = TimeSpan.FromMinutes(15);
@@ -31,7 +33,9 @@ namespace AuraNova.Infrastructure.Payments
         {
             var order = await db.Orders
                 .Include(o => o.Customer)
+                .Include(o => o.Items!).ThenInclude(i => i.Product)
                 .Include(o => o.Payment!).ThenInclude(p => p.Transactions)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(o => o.Id == orderId, cancellationToken)
                 ?? throw new OnlinePaymentException("No encontramos este pedido.");
 
@@ -80,8 +84,16 @@ namespace AuraNova.Infrastructure.Payments
                     throw new OnlinePaymentException("Ingresa el celular de 9 dígitos asociado a tu Yape.");
             }
 
-            string? documentNumber = new string((request.IdentificationNumber ?? string.Empty).Where(char.IsLetterOrDigit).ToArray());
+            // Documento: el que escribió en el formulario de la tarjeta o, si no, el DNI que dio al pedir
+            string? documentNumber = new string((request.IdentificationNumber ?? MercadoPagoOrderData.PayerDocument(order) ?? string.Empty)
+                .Where(char.IsLetterOrDigit).ToArray());
             if (documentNumber.Length == 0) documentNumber = null;
+
+            var (firstName, lastName) = MercadoPagoOrderData.SplitName(order.Customer?.Name);
+            var history = order.Customer == null ? null : new GatewayBuyerHistory(
+                order.Customer.CreatedAt,
+                await LastPurchaseAsync(order, cancellationToken),
+                LocalPickup: order.DeliveryType == DeliveryType.MeetingPoint);
 
             var transaction = new PaymentTransaction
             {
@@ -102,17 +114,26 @@ namespace AuraNova.Infrastructure.Payments
                 result = await gateway.CreateOrderAsync(new GatewayCreateOrder(
                     ExternalReference: transaction.Id.ToString("N"),
                     Amount: amount,
-                    Description: $"Pedido {order.OrderCode} - Aura Nova",
+                    Description: $"Pedido {order.OrderCode} - Aura Nova" + (isDeposit ? " (adelanto 50%)" : isFirstPayment ? "" : " (saldo)"),
                     PayerEmail: email,
-                    // La API exige el número si se envía el documento: solo va cuando el cliente lo ingresó
-                    IdentificationType: documentNumber == null ? null : request.IdentificationType?.Trim() is { Length: > 0 } type ? type : "DNI",
+                    // La API exige el número si se envía el documento: solo va cuando lo tenemos
+                    IdentificationType: documentNumber == null ? null
+                        : request.IdentificationType?.Trim() is { Length: > 0 } type ? type
+                        : documentNumber.Length == 8 && documentNumber.All(char.IsDigit) ? "DNI" : "CE",
                     IdentificationNumber: documentNumber,
-                    PhoneNumber: phone,
+                    PhoneNumber: phone ?? MercadoPagoOrderData.Phone(order.Customer?.Phone),
                     PaymentMethodId: methodId,
                     PaymentMethodType: methodType,
                     Token: request.Token.Trim(),
                     Installments: request.Installments,
-                    IdempotencyKey: MercadoPagoGateway.IdempotencyKeyFor(request.Token.Trim())), cancellationToken);
+                    IdempotencyKey: MercadoPagoGateway.IdempotencyKeyFor(request.Token.Trim()),
+                    PayerFirstName: firstName,
+                    PayerLastName: lastName,
+                    PayerAddress: MercadoPagoOrderData.PayerAddress(order),
+                    Items: MercadoPagoOrderData.Items(order, amount, path => storageUrls?.ToPublicUrl(path) ?? path),
+                    ShipmentAddress: MercadoPagoOrderData.ShipmentAddress(order),
+                    History: history,
+                    DeviceId: request.DeviceId?.Trim()), cancellationToken);
             }
             catch (MercadoPagoGatewayException ex)
             {
@@ -254,6 +275,12 @@ namespace AuraNova.Infrastructure.Payments
             if (confirmsOrder)
                 await notificationService.NotifyAsync(order.Id, NotificationType.PaymentConfirmed);
         }
+
+        /// <summary>Fecha del último pedido pagado del mismo cliente (null si es su primera compra).</summary>
+        private async Task<DateTimeOffset?> LastPurchaseAsync(Order order, CancellationToken cancellationToken) =>
+            await db.Orders
+                .Where(o => o.CustomerId == order.CustomerId && o.Id != order.Id && o.Payment != null && o.Payment.AmountPaid > 0)
+                .MaxAsync(o => (DateTimeOffset?)o.CreatedAt, cancellationToken);
 
         private static (string Id, string Type) ResolveMethod(CreateOnlinePaymentRequest request)
         {
