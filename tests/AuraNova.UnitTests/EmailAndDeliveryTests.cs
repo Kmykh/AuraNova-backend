@@ -117,7 +117,7 @@ namespace AuraNova.UnitTests
             await db.SaveChangesAsync();
 
             var sender = new Mock<IEmailSender>();
-            var send = sender.Setup(s => s.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()));
+            var send = sender.Setup(s => s.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()));
             if (fail) send.ThrowsAsync(new InvalidOperationException("SMTP caído"));
             else send.Returns(Task.CompletedTask);
             var settings = new Mock<IBusinessSettingsService>();
@@ -129,7 +129,49 @@ namespace AuraNova.UnitTests
             var saved = await db.Notifications.FindAsync(notification.Id);
             Assert.Equal(expected, saved!.Status);
             if (fail) Assert.Contains("SMTP", saved.ErrorMessage);
-            else sender.Verify(s => s.SendAsync("maria@example.com", "Asunto", It.Is<string>(h => h.Contains("Ir a pagar")), It.IsAny<string>(), It.IsAny<CancellationToken>()));
+            else sender.Verify(s => s.SendAsync("maria@example.com", "Asunto", It.Is<string>(h => h.Contains("Ir a pagar")), It.IsAny<string>(),
+                It.Is<string?>(key => key != null && key.StartsWith(notification.Id.ToString("N"))), It.IsAny<CancellationToken>()));
+        }
+
+        [Fact]
+        public async Task Resend_SendsJsonWithKey_AndExplainsErrors()
+        {
+            var handler = new CaptureHandler(System.Net.HttpStatusCode.OK, "{\"id\":\"abc\"}");
+            var settings = Microsoft.Extensions.Options.Options.Create(new EmailSettings
+            {
+                ApiKey = "re_test", FromAddress = "pedidos@auranova.test", FromName = "Aura Nova", ReplyTo = "auranova@gmail.com"
+            });
+            Assert.True(settings.Value.UsesResend);
+            Assert.True(settings.Value.IsConfigured);
+
+            var sender = new ResendEmailSender(new HttpClient(handler) { BaseAddress = new Uri("https://api.resend.com/") }, settings);
+            await sender.SendAsync("maria@example.com", "Asunto", "<p>Hola</p>", "Hola", "clave-1");
+
+            Assert.Equal("https://api.resend.com/emails", handler.Request!.RequestUri!.ToString());
+            Assert.Equal("Bearer re_test", handler.Request.Headers.Authorization!.ToString());
+            Assert.Equal("clave-1", handler.Request.Headers.GetValues("Idempotency-Key").Single());
+            var json = System.Text.Json.JsonDocument.Parse(handler.Body).RootElement;
+            Assert.Equal("Aura Nova <pedidos@auranova.test>", json.GetProperty("from").GetString());
+            Assert.Equal("auranova@gmail.com", json.GetProperty("reply_to").GetString());
+            Assert.Equal("maria@example.com", json.GetProperty("to")[0].GetString());
+
+            var failing = new ResendEmailSender(new HttpClient(new CaptureHandler(System.Net.HttpStatusCode.Forbidden,
+                "{\"statusCode\":403,\"message\":\"The auranova.test domain is not verified.\"}")) { BaseAddress = new Uri("https://api.resend.com/") }, settings);
+            var error = await Assert.ThrowsAsync<EmailSendException>(() => failing.SendAsync("maria@example.com", "A", "<p>B</p>", "B"));
+            Assert.Contains("domain is not verified", error.Message);
+        }
+
+        private sealed class CaptureHandler(System.Net.HttpStatusCode status, string response) : HttpMessageHandler
+        {
+            public HttpRequestMessage? Request { get; private set; }
+            public string Body { get; private set; } = string.Empty;
+
+            protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                Request = request;
+                Body = request.Content == null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken);
+                return new HttpResponseMessage(status) { Content = new StringContent(response) };
+            }
         }
 
         [Fact]

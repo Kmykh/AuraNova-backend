@@ -187,10 +187,19 @@ builder.Services.Configure<AuraNova.Infrastructure.Notifications.PublicSiteSetti
 builder.Services.AddScoped<AuraNova.Application.Notifications.Interfaces.INotificationTemplateService, AuraNova.Infrastructure.Notifications.NotificationTemplateService>();
 builder.Services.AddScoped<AuraNova.Application.Notifications.Interfaces.INotificationService, AuraNova.Infrastructure.Notifications.NotificationService>();
 
-// Correos automáticos por SMTP (sección "Email"); sin credenciales quedan desactivados
+// Correos automáticos (sección "Email"): Resend por HTTPS si hay ApiKey, si no SMTP; sin configuración quedan desactivados
 builder.Services.Configure<AuraNova.Infrastructure.Notifications.Email.EmailSettings>(builder.Configuration.GetSection("Email"));
 builder.Services.AddSingleton<AuraNova.Infrastructure.Notifications.Email.IEmailQueue, AuraNova.Infrastructure.Notifications.Email.EmailQueue>();
-builder.Services.AddScoped<AuraNova.Infrastructure.Notifications.Email.IEmailSender, AuraNova.Infrastructure.Notifications.Email.SmtpEmailSender>();
+builder.Services.AddHttpClient<AuraNova.Infrastructure.Notifications.Email.ResendEmailSender>(client =>
+{
+    client.BaseAddress = new Uri("https://api.resend.com/");
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
+builder.Services.AddScoped<AuraNova.Infrastructure.Notifications.Email.SmtpEmailSender>();
+builder.Services.AddScoped<AuraNova.Infrastructure.Notifications.Email.IEmailSender>(sp =>
+    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AuraNova.Infrastructure.Notifications.Email.EmailSettings>>().Value.UsesResend
+        ? sp.GetRequiredService<AuraNova.Infrastructure.Notifications.Email.ResendEmailSender>()
+        : sp.GetRequiredService<AuraNova.Infrastructure.Notifications.Email.SmtpEmailSender>());
 builder.Services.AddScoped<AuraNova.Infrastructure.Notifications.Email.EmailNotificationDispatcher>();
 builder.Services.AddHostedService<AuraNova.API.Services.EmailDispatchWorker>();
 builder.Services.AddHostedService<AuraNova.API.Services.PaymentReconciliationWorker>();
