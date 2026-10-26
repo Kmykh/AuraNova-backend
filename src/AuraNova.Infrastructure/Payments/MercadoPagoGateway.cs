@@ -61,7 +61,8 @@ namespace AuraNova.Infrastructure.Payments
         string? StatusDetail,
         string? ExternalReference,
         decimal TotalPaidAmount,
-        IReadOnlyList<GatewayPayment> Payments)
+        IReadOnlyList<GatewayPayment> Payments,
+        decimal RefundedAmount = 0)
     {
         /// <summary>Pago aprobado y acreditado.</summary>
         public bool IsApproved => Status == "processed" &&
@@ -81,6 +82,15 @@ namespace AuraNova.Infrastructure.Payments
     {
         Task<GatewayOrder> CreateOrderAsync(GatewayCreateOrder request, CancellationToken cancellationToken = default);
         Task<GatewayOrder?> GetOrderAsync(string orderId, CancellationToken cancellationToken = default);
+
+        /// <summary>Busca la order por nuestra referencia (si se perdió la respuesta al crearla).</summary>
+        Task<GatewayOrder?> FindByExternalReferenceAsync(string externalReference, CancellationToken cancellationToken = default);
+
+        /// <summary>Devuelve el pago: total si <paramref name="amount"/> es null, o parcial.</summary>
+        Task<GatewayOrder> RefundAsync(string orderId, string? paymentId, decimal? amount, string idempotencyKey, CancellationToken cancellationToken = default);
+
+        /// <summary>Anula una order que aún no se cobró (en proceso o esperando una acción).</summary>
+        Task<GatewayOrder> CancelAsync(string orderId, CancellationToken cancellationToken = default);
     }
 
     /// <summary>Checkout API con la API de Orders, usando el SDK oficial (mercadopago-sdk).</summary>
@@ -204,6 +214,70 @@ namespace AuraNova.Infrastructure.Payments
             }
         }
 
+        public async Task<GatewayOrder?> FindByExternalReferenceAsync(string externalReference, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var now = DateTimeOffset.UtcNow;
+                var result = await _client.SearchAsync(
+                    new OrderSearchRequest
+                    {
+                        ExternalReference = externalReference,
+                        BeginDate = now.AddDays(-3).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture),
+                        EndDate = now.AddMinutes(1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture)
+                    },
+                    Options(null), cancellationToken);
+                var found = result?.Data?.FirstOrDefault();
+                // La búsqueda devuelve un resumen: se consulta la order completa
+                return found?.Id == null ? null : await GetOrderAsync(found.Id, cancellationToken);
+            }
+            catch (Exception ex) when (ex is MercadoPagoApiException or MercadoPagoException)
+            {
+                throw new MercadoPagoGatewayException("No pudimos buscar el pago en Mercado Pago.", ex);
+            }
+        }
+
+        public async Task<GatewayOrder> RefundAsync(string orderId, string? paymentId, decimal? amount, string idempotencyKey, CancellationToken cancellationToken = default)
+        {
+            var request = amount == null || paymentId == null
+                ? null
+                : new OrderRefundPaymentRequest
+                {
+                    Transactions = new List<OrderRefundTransactionRequest> { new() { Id = paymentId, Amount = Money(amount.Value) } }
+                };
+
+            try
+            {
+                return Map(await _client.RefundAsync(orderId, request, Options(idempotencyKey), cancellationToken));
+            }
+            catch (MercadoPagoApiException ex)
+            {
+                logger.LogWarning("Mercado Pago rechazó la devolución de {OrderId} ({Status}): {Error}",
+                    orderId, ex.StatusCode, ex.ApiResponse?.Content ?? ex.Message);
+                throw new MercadoPagoGatewayException(ex.StatusCode switch
+                {
+                    >= 500 => "Mercado Pago no responde en este momento. Inténtalo en unos minutos.",
+                    _ => "Mercado Pago no permitió la devolución. Revisa el monto o si el pago ya fue devuelto."
+                }, ex);
+            }
+            catch (MercadoPagoException ex)
+            {
+                throw new MercadoPagoGatewayException("No pudimos conectar con Mercado Pago. Inténtalo en unos minutos.", ex);
+            }
+        }
+
+        public async Task<GatewayOrder> CancelAsync(string orderId, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                return Map(await _client.CancelAsync(orderId, Options(Guid.NewGuid().ToString()), cancellationToken));
+            }
+            catch (Exception ex) when (ex is MercadoPagoApiException or MercadoPagoException)
+            {
+                throw new MercadoPagoGatewayException("No pudimos anular el pago en Mercado Pago.", ex);
+            }
+        }
+
         private RequestOptions Options(string? idempotencyKey)
         {
             if (string.IsNullOrWhiteSpace(_settings.AccessToken))
@@ -230,7 +304,8 @@ namespace AuraNova.Infrastructure.Payments
             ParseAmount(order.TotalPaidAmount),
             (order.Transactions?.Payments ?? [])
                 .Select(p => new GatewayPayment(p.Id, p.Status, p.StatusDetail, p.PaymentMethod?.Id, p.PaymentMethod?.Type))
-                .ToList());
+                .ToList(),
+            (order.Transactions?.Payments ?? []).Sum(p => ParseAmount(p.RefundedAmount)));
 
         public static GatewayOrder? TryParse(string? json)
         {

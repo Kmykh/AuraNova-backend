@@ -33,6 +33,15 @@ namespace AuraNova.IntegrationTests
                     MpOrderId, "processed", "accredited", externalReference, 50m,
                     [new GatewayPayment("PAY01", "processed", "accredited", "visa", "credit_card")]));
             }
+
+            public Task<GatewayOrder?> FindByExternalReferenceAsync(string externalReference, CancellationToken cancellationToken = default) =>
+                Task.FromResult<GatewayOrder?>(null);
+
+            public Task<GatewayOrder> RefundAsync(string orderId, string? paymentId, decimal? amount, string idempotencyKey, CancellationToken cancellationToken = default) =>
+                throw new NotSupportedException();
+
+            public Task<GatewayOrder> CancelAsync(string orderId, CancellationToken cancellationToken = default) =>
+                throw new NotSupportedException();
         }
 
         private static (WebApplicationFactory<Program> Factory, ApprovedGateway Gateway, Guid OrderId) Setup()
@@ -103,6 +112,13 @@ namespace AuraNova.IntegrationTests
             return request;
         }
 
+        private static async Task<List<string>> WebhookResults(WebApplicationFactory<Program> factory)
+        {
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            return await db.PaymentWebhookEvents.OrderBy(e => e.ReceivedAt).Select(e => e.Result).ToListAsync();
+        }
+
         private static async Task<(Order Order, Payment Payment)> Load(WebApplicationFactory<Program> factory, Guid orderId)
         {
             using var scope = factory.Services.CreateScope();
@@ -127,6 +143,7 @@ namespace AuraNova.IntegrationTests
             var (order, payment) = await Load(factory, orderId);
             Assert.Equal(OrderStatus.PaymentConfirmed, order.Status);
             Assert.Equal(50m, payment.AmountPaid);
+            Assert.Equal(["processed", "processed"], await WebhookResults(factory));
         }
 
         [Fact]
@@ -142,6 +159,7 @@ namespace AuraNova.IntegrationTests
             var (order, payment) = await Load(factory, orderId);
             Assert.Equal(OrderStatus.WaitingPayment, order.Status);
             Assert.Equal(0m, payment.AmountPaid);
+            Assert.Equal(["invalid_signature"], await WebhookResults(factory));
         }
 
         [Fact]

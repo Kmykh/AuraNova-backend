@@ -62,6 +62,7 @@ namespace AuraNova.API.Controllers
                 catch (InvalidWebhookSignatureException ex)
                 {
                     logger.LogWarning("Webhook de Mercado Pago con firma inválida ({Reason}), request {RequestId}", ex.Reason, requestId);
+                    await LogWebhookAsync(type, dataId, "invalid_signature", $"Firma inválida ({ex.Reason}). Revisa MercadoPago__WebhookSecret.");
                     return Unauthorized();
                 }
             }
@@ -72,7 +73,10 @@ namespace AuraNova.API.Controllers
 
             // Solo nos interesan las orders; el resto se confirma para que Mercado Pago no reintente
             if (!string.Equals(type, "order", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(dataId))
+            {
+                await LogWebhookAsync(type, dataId, "ignored", "Tópico que no usamos.");
                 return Ok();
+            }
 
             try
             {
@@ -82,10 +86,25 @@ namespace AuraNova.API.Controllers
             {
                 // 500: Mercado Pago reintentará el aviso más tarde
                 logger.LogError(ex, "No se pudo procesar el webhook de la order {OrderId}", dataId);
+                await LogWebhookAsync(type, dataId, "error", ex.Message);
                 return StatusCode(StatusCodes.Status500InternalServerError);
             }
 
+            await LogWebhookAsync(type, dataId, "processed", null);
             return Ok();
+        }
+
+        /// <summary>El registro de avisos es solo informativo: si falla, no afecta la respuesta a Mercado Pago.</summary>
+        private async Task LogWebhookAsync(string? topic, string? resourceId, string result, string? detail)
+        {
+            try
+            {
+                await onlinePayments.LogWebhookAsync(topic, resourceId, result, detail);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "No se pudo registrar el aviso de Mercado Pago");
+            }
         }
     }
 }

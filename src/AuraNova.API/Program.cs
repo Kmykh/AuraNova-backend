@@ -193,6 +193,7 @@ builder.Services.AddSingleton<AuraNova.Infrastructure.Notifications.Email.IEmail
 builder.Services.AddScoped<AuraNova.Infrastructure.Notifications.Email.IEmailSender, AuraNova.Infrastructure.Notifications.Email.SmtpEmailSender>();
 builder.Services.AddScoped<AuraNova.Infrastructure.Notifications.Email.EmailNotificationDispatcher>();
 builder.Services.AddHostedService<AuraNova.API.Services.EmailDispatchWorker>();
+builder.Services.AddHostedService<AuraNova.API.Services.PaymentReconciliationWorker>();
 
 // register dashboard services
 builder.Services.AddScoped<AuraNova.Application.Dashboard.Interfaces.IDashboardService, AuraNova.Infrastructure.Dashboard.DashboardService>();

@@ -24,6 +24,7 @@ namespace AuraNova.Infrastructure.Persistence
         public DbSet<Quote> Quotes { get; set; } = null!;
         public DbSet<Payment> Payments { get; set; } = null!;
         public DbSet<PaymentTransaction> PaymentTransactions { get; set; } = null!;
+        public DbSet<PaymentWebhookEvent> PaymentWebhookEvents { get; set; } = null!;
         public DbSet<OrderStatusHistory> OrderStatusHistory { get; set; } = null!;
         public DbSet<Notification> Notifications { get; set; } = null!;
         public DbSet<AuraNova.Domain.Entities.BusinessSettings> BusinessSettings { get; set; } = null!;

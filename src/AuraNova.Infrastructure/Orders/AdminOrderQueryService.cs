@@ -323,6 +323,7 @@ namespace AuraNova.Infrastructure.Orders
                         .OrderByDescending(t => t.CreatedAt)
                         .Select(t => new AdminPaymentTransaction
                         {
+                            Id = t.Id,
                             MethodId = t.MethodId,
                             MethodType = t.MethodType,
                             Amount = t.Amount,
@@ -331,6 +332,8 @@ namespace AuraNova.Infrastructure.Orders
                             StatusDetail = t.StatusDetail,
                             Approved = t.ApprovedAt != null,
                             ExternalOrderId = t.ExternalOrderId,
+                            RefundedAmount = t.RefundedAmount,
+                            RefundedAt = t.RefundedAt,
                             CreatedAt = t.CreatedAt
                         }).ToList()
                 };

@@ -100,6 +100,7 @@ namespace AuraNova.Application.AdminOrders.DTOs
 
     public class AdminPaymentTransaction
     {
+        public Guid Id { get; set; }
         public string MethodId { get; set; } = string.Empty;
         public string? MethodType { get; set; }
         public decimal Amount { get; set; }
@@ -108,6 +109,8 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public string? StatusDetail { get; set; }
         public bool Approved { get; set; }
         public string? ExternalOrderId { get; set; }
+        public decimal RefundedAmount { get; set; }
+        public DateTimeOffset? RefundedAt { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
     }
 
