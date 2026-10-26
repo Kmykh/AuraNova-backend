@@ -34,7 +34,8 @@ namespace AuraNova.API.Controllers
             }
             catch (OnlinePaymentException ex)
             {
-                return BadRequest(new { message = ex.Message });
+                // ProblemDetails: el frontend muestra "detail" tal cual al cliente
+                return Problem(detail: ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "No se pudo procesar el pago");
             }
         }
 
