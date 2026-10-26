@@ -170,6 +170,27 @@ namespace AuraNova.Infrastructure.Notifications
                 """.Replace("                ", "");
         }
 
+        public async Task<string> BuildBalancePaidMessageAsync(Order order)
+        {
+            var businessName = await GetBusinessNameAsync();
+            var next = order.Status == OrderStatus.Ready
+                ? "Tu pedido ya está listo: te escribimos para coordinar la entrega."
+                : "Seguimos preparando tu pedido y te avisamos cuando esté listo.";
+            return $"""
+                Hola {GetName(order)}
+                
+                Recibimos el pago de tu saldo. Tu pedido {order.OrderCode} está pagado por completo (S/ {order.Payment?.AmountPaid ?? 0m:F2}).
+                
+                {next}
+                
+                Pedido: {order.OrderCode}
+                Código de seguimiento: {order.TrackingToken}
+                Síguelo aquí: {TrackingUrl(order)}
+                
+                Gracias por elegir {businessName}
+                """.Replace("                ", "");
+        }
+
         public async Task<string> BuildPaymentRejectedMessageAsync(Order order, string? reason)
         {
             await Task.CompletedTask;
