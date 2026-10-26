@@ -129,7 +129,7 @@ namespace AuraNova.UnitTests
             var saved = await db.Notifications.FindAsync(notification.Id);
             Assert.Equal(expected, saved!.Status);
             if (fail) Assert.Contains("SMTP", saved.ErrorMessage);
-            else sender.Verify(s => s.SendAsync("maria@example.com", "Asunto", It.Is<string>(h => h.Contains("Ir a pagar")), It.IsAny<string>(),
+            else sender.Verify(s => s.SendAsync("maria@example.com", "Asunto", It.Is<string>(h => h.Contains("Ver cotización y pagar")), It.IsAny<string>(),
                 It.Is<string?>(key => key != null && key.StartsWith(notification.Id.ToString("N"))), It.IsAny<CancellationToken>()));
         }
 
@@ -194,14 +194,67 @@ namespace AuraNova.UnitTests
             }
         }
 
+        private static readonly EmailBrand Brand = new("Aura Nova", "https://tienda.test", "959746278");
+
         [Fact]
         public void Template_EscapesHtml_AndLinksUrls()
         {
-            var html = EmailTemplate.Render("Aura Nova", "Hola", "Nombre: <script>alert(1)</script>\nVer: https://tienda.test/seguimiento/ABCD", "Ver mi pedido", "https://tienda.test");
+            var layout = new EmailLayout("Pedido AN-1", "Hola", null, EmailTone.Neutral, "Ver mi pedido", "https://tienda.test");
+            var html = EmailTemplate.Render(Brand, layout, "Nombre: <script>alert(1)</script>\nVer: https://tienda.test/seguimiento/ABCD");
 
             Assert.DoesNotContain("<script>", html);
             Assert.Contains("&lt;script&gt;", html);
             Assert.Contains("<a href=\"https://tienda.test/seguimiento/ABCD\"", html);
+        }
+
+        [Fact]
+        public void Template_ShapesTheMessage_LikeTheStore()
+        {
+            const string pay = "https://tienda.test/pago/1";
+            var layout = new EmailLayout("Pedido AN-1005", "Tu pedido está reservado", "Falta el pago", EmailTone.Warning, "Pagar mi pedido", pay);
+            var message = $"Hola María,\n\nTu pedido está reservado. Paga el 50 % o el total.\n\nPedido: AN-1005\nTotal: S/ 20.00\nPagar: {pay}\nCódigo de seguimiento: RJG7-ZBAY\n\nGracias por elegir Aura Nova";
+
+            var html = EmailTemplate.Render(Brand, layout, message);
+
+            Assert.Contains(">Hola María,</p>", html);
+            Assert.Contains(">Total</td>", html);                       // los datos van en tabla
+            Assert.Contains("RJG7-ZBAY", html);
+            Assert.Contains("Falta el pago", html);
+            Assert.Contains(">Pagar mi pedido</a>", html);
+            Assert.DoesNotContain(">Ir a pagar &rarr;</a>", html);      // el enlace del botón no se repite en la tabla
+            Assert.Contains("font-style:italic;font-size:16px;color:#6b5a50\">Gracias por elegir Aura Nova", html);
+            Assert.Contains(">Paga el 50 % o el total.</p>", html);              // la frase igual al título no se repite
+            Assert.Contains("Paga el 50 % o el total.&#8199;", html.Replace("\n", "")); // texto de vista previa
+            Assert.Contains("https://wa.me/51959746278", html);
+            Assert.Contains("prefers-color-scheme: dark", html);
+            Assert.Contains("https://tienda.test/mail/flortallo.png", html);
+        }
+
+        [Fact]
+        public void Template_KeepsSentencesWithColons_AsParagraphs_AndSkipsTheRepeatedTitle()
+        {
+            var layout = new EmailLayout("Pedido AN-1", "Tu pedido va en camino", "En camino", EmailTone.Neutral, null, null);
+            var html = EmailTemplate.Render(Brand, layout, "Hola,\n\nTu pedido va en camino. Lo dejamos en Shalom.\n\nOjo con esto que es largo: es una frase\n\nPedido: AN-1");
+
+            Assert.Contains(">Lo dejamos en Shalom.</p>", html);
+            Assert.Contains(">Ojo con esto que es largo: es una frase</p>", html);
+            Assert.Contains(">Pedido</td>", html);
+        }
+
+        [Theory]
+        [InlineData(NotificationType.PaymentConfirmed, "¡Recibimos tu adelanto! · AN-1", "https://t/seguimiento/X", "¡Recibimos tu adelanto!", "Adelanto pagado", "Ver mi pedido")]
+        [InlineData(NotificationType.PaymentConfirmed, "¡Tu pedido está pagado! · AN-1", "https://t/seguimiento/X", "¡Tu pedido está pagado!", "Pago aprobado", "Ver mi pedido")]
+        [InlineData(NotificationType.OrderReady, "¡Tu pedido está listo! · AN-1", "https://t/pago/1", "¡Tu pedido está listo!", "Falta el saldo", "Pagar el saldo")]
+        [InlineData(NotificationType.OrderReady, "¡Tu pedido está listo! · AN-1", "https://t/seguimiento/X", "¡Tu pedido está listo!", "Listo", "Ver mi pedido")]
+        [InlineData(NotificationType.OrderCreated, "Tu pedido está reservado · AN-1", "https://t/pago/1", "Tu pedido está reservado", "Falta el pago", "Pagar mi pedido")]
+        public void EmailCopy_UsesTheStoredSubjectAndLink(NotificationType type, string subject, string url, string title, string badge, string label)
+        {
+            var layout = EmailCopy.For(type, subject, url, "AN-1", isCustomOrder: false);
+
+            Assert.Equal("Pedido AN-1", layout.Eyebrow);
+            Assert.Equal(title, layout.Title);
+            Assert.Equal(badge, layout.Badge);
+            Assert.Equal(label, layout.ActionLabel);
         }
 
         [Fact]

@@ -4,6 +4,7 @@ using AuraNova.Domain.Enums;
 using AuraNova.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace AuraNova.Infrastructure.Notifications.Email
 {
@@ -12,21 +13,25 @@ namespace AuraNova.Infrastructure.Notifications.Email
         AppDbContext db,
         IEmailSender sender,
         IBusinessSettingsService businessSettings,
-        ILogger<EmailNotificationDispatcher> logger)
+        ILogger<EmailNotificationDispatcher> logger,
+        IOptions<PublicSiteSettings>? siteOptions = null)
     {
         public async Task DispatchAsync(Guid notificationId, CancellationToken cancellationToken = default)
         {
             var notification = await db.Set<Notification>()
+                .Include(n => n.Order)
                 .FirstOrDefaultAsync(n => n.Id == notificationId && n.Channel == NotificationChannel.Email, cancellationToken);
             if (notification == null || notification.Status == NotificationStatus.Sent)
                 return;
 
-            var businessName = (await businessSettings.GetPublicAsync()).BusinessName;
-            if (string.IsNullOrWhiteSpace(businessName)) businessName = "Aura Nova";
+            var settings = await businessSettings.GetPublicAsync();
+            var businessName = string.IsNullOrWhiteSpace(settings.BusinessName) ? "Aura Nova" : settings.BusinessName;
+            var brand = new EmailBrand(businessName, siteOptions?.Value.BaseUrl ?? new PublicSiteSettings().BaseUrl, settings.WhatsAppNumber);
 
             var subject = notification.Subject ?? businessName;
-            var actionLabel = notification.ChannelUrl?.Contains("/pago/", StringComparison.Ordinal) == true ? "Ir a pagar" : "Ver mi pedido";
-            var html = EmailTemplate.Render(businessName, subject, notification.Message, actionLabel, notification.ChannelUrl);
+            var layout = EmailCopy.For(notification.Type, notification.Subject, notification.ChannelUrl,
+                notification.Order?.OrderCode ?? "", notification.Order?.IsCustomOrder == true);
+            var html = EmailTemplate.Render(brand, layout, notification.Message);
 
             try
             {
