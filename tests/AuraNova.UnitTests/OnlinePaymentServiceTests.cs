@@ -149,6 +149,34 @@ namespace AuraNova.UnitTests
         }
 
         [Fact]
+        public async Task SendsBuyerProductsAndDevice_ForMercadoPagoQuality()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 100m);
+            order.Customer!.Name = "María López Pérez";
+            order.DeliveryAddress = "Jr. Puno 450";
+            order.District = "El Tambo";
+            order.Department = "Junín";
+            await db.SaveChangesAsync();
+            var (service, gateway, _) = Build(db);
+
+            var request = Card(payFull: false);
+            request.DeviceId = "armor.abc123";
+            await service.PayAsync(order.Id, request);
+
+            var sent = gateway.Created.Single();
+            Assert.Equal("María", sent.PayerFirstName);
+            Assert.Equal("López Pérez", sent.PayerLastName);
+            Assert.Equal("987654321", sent.PhoneNumber);
+            Assert.Equal("armor.abc123", sent.DeviceId);
+            Assert.Equal("Jr. Puno 450", sent.PayerAddress?.StreetName);
+            Assert.Equal("Jr. Puno 450", sent.ShipmentAddress?.StreetName);
+            Assert.Equal(50m, sent.Items!.Sum(i => i.Quantity * i.UnitPrice));
+            Assert.Null(sent.History?.LastPurchaseAt);
+            Assert.Contains("adelanto 50%", sent.Description);
+        }
+
+        [Fact]
         public async Task Rejected_KeepsOrderWaitingPayment_WithFriendlyMessage()
         {
             using var db = GetDb();
