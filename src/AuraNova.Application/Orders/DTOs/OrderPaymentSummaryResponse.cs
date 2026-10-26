@@ -8,6 +8,11 @@ namespace AuraNova.Application.Orders.DTOs
     {
         public Guid OrderId { get; set; }
         public string OrderCode { get; set; } = null!;
+        /// <summary>
+        /// Código de seguimiento: quien tiene el enlace de pago (un GUID que solo recibe el cliente) ya lo recibió
+        /// junto a ese enlace; sirve para llevarlo a su seguimiento después de pagar.
+        /// </summary>
+        public string TrackingCode { get; set; } = null!;
         public string Status { get; set; } = null!;
         public string StatusLabel { get; set; } = null!;
         public string DeliveryType { get; set; } = null!;
