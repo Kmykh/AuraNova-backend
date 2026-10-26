@@ -2,6 +2,8 @@ namespace AuraNova.Domain.Enums
 {
     public enum NotificationChannel
     {
-        WhatsApp
+        WhatsApp,
+        /// <summary>Correo enviado automáticamente por el backend.</summary>
+        Email
     }
 }
