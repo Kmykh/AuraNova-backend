@@ -27,6 +27,16 @@ namespace AuraNova.Domain.Entities
         public string? Province { get; set; }
         public string? District { get; set; }
 
+        // Quién recibe (regalos) y datos que piden las agencias en envíos nacionales
+        public string? RecipientName { get; set; }
+        public string? RecipientPhone { get; set; }
+        /// <summary>DNI o CE de quien recoge en la agencia.</summary>
+        public string? RecipientDocument { get; set; }
+        /// <summary>Referencia de la dirección (color de la casa, piso, frente a…).</summary>
+        public string? DeliveryReference { get; set; }
+        /// <summary>Agencia que prefiere el cliente para envíos nacionales (Shalom, Olva).</summary>
+        public string? PreferredAgency { get; set; }
+
         public decimal Subtotal { get; set; }
         public decimal? DeliveryCost { get; set; }
         public decimal? Total { get; set; }

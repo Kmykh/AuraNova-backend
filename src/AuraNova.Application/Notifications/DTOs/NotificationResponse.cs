@@ -11,6 +11,10 @@ namespace AuraNova.Application.Notifications.DTOs
         public string Channel { get; set; } = null!;
         public string Status { get; set; } = null!;
         public string Recipient { get; set; } = null!;
+        public string? CustomerName { get; set; }
+        public string? Subject { get; set; }
+        public string? ErrorMessage { get; set; }
+        public DateTimeOffset? SentAt { get; set; }
         public string Message { get; set; } = null!;
         public string? ChannelUrl { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
