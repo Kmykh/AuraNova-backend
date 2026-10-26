@@ -96,6 +96,9 @@ namespace AuraNova.Infrastructure.Orders
                     MeetingPointName = o.MeetingPoint != null ? o.MeetingPoint.Name : null,
                     o.District,
                     PaymentStatus = o.Payment != null ? (PaymentStatus?)o.Payment.Status : null,
+                    BalanceDue = o.Payment != null && o.Payment.AmountPaid > 0 && o.Payment.AmountPaid < o.Payment.Amount
+                        ? (decimal?)(o.Payment.Amount - o.Payment.AmountPaid)
+                        : null,
                     ReferenceImageCount = o.ReferenceImages!.Count(),
                     Items = o.Items!
                         .Select(i => new
@@ -137,6 +140,7 @@ namespace AuraNova.Infrastructure.Orders
                         _ => o.District
                     },
                     PaymentStatus = o.PaymentStatus?.ToString(),
+                    BalanceDue = o.BalanceDue,
                     ReferenceImageCount = o.ReferenceImageCount,
                     ItemCount = o.Items.Sum(i => i.Quantity),
                     Items = o.Items.Select(i => new AdminOrderListProduct

@@ -117,6 +117,7 @@ namespace AuraNova.Infrastructure.Orders
             .ThenInclude(i => i.Product)
             .Include(o => o.DeliveryZone)
             .Include(o => o.MeetingPoint)
+            .Include(o => o.Payment)
             .Include(o => o.ReferenceImages);
 
         private async Task<PublicTrackingResponse> MapAsync(Order order)
@@ -180,7 +181,10 @@ namespace AuraNova.Infrastructure.Orders
                     Subtotal = order.Subtotal,
                     DeliveryCost = order.DeliveryCost,
                     CustomizationCost = order.CustomizationCost,
-                    Total = order.Total
+                    Total = order.Total,
+                    AmountPaid = order.Payment?.AmountPaid ?? 0m,
+                    // Solo hay saldo cuando ya se pagó el adelanto
+                    BalanceDue = order.Payment is { AmountPaid: > 0 } paid ? Math.Max(0, paid.Amount - paid.AmountPaid) : 0m
                 },
 
                 Estimates = new PublicTrackingEstimates
