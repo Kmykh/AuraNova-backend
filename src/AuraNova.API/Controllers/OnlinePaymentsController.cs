@@ -60,13 +60,14 @@ namespace AuraNova.API.Controllers
         {
             var signature = Request.Headers["x-signature"].ToString();
             var requestId = Request.Headers["x-request-id"].ToString();
-            var secret = settings.Value.WebhookSecret;
+            // Se limpian espacios o saltos de línea que se cuelan al pegar la clave en Render
+            var secret = settings.Value.WebhookSecret?.Trim();
 
             if (!string.IsNullOrWhiteSpace(secret))
             {
                 try
                 {
-                    WebhookSignatureValidator.Validate(signature, requestId, dataId, secret);
+                    ValidateSignature(signature, requestId, dataId, secret);
                 }
                 catch (InvalidWebhookSignatureException ex)
                 {
@@ -101,6 +102,23 @@ namespace AuraNova.API.Controllers
 
             await LogWebhookAsync(type, dataId, "processed", null);
             return Ok();
+        }
+
+        /// <summary>
+        /// Mercado Pago firma el data.id en minúsculas (los ids de Orders llevan letras: ORD01...), pero el SDK de .NET
+        /// lo usa tal cual llega y la firma nunca coincidía. Se acepta también tal cual, por compatibilidad.
+        /// </summary>
+        private static void ValidateSignature(string signature, string requestId, string? dataId, string secret)
+        {
+            var lowercaseId = dataId?.ToLowerInvariant();
+            try
+            {
+                WebhookSignatureValidator.Validate(signature, requestId, lowercaseId, secret);
+            }
+            catch (InvalidWebhookSignatureException) when (dataId != lowercaseId)
+            {
+                WebhookSignatureValidator.Validate(signature, requestId, dataId, secret);
+            }
         }
 
         /// <summary>El registro de avisos es solo informativo: si falla, no afecta la respuesta a Mercado Pago.</summary>

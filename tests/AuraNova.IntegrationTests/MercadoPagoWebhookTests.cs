@@ -94,11 +94,12 @@ namespace AuraNova.IntegrationTests
             return (factory, gateway, order.Id);
         }
 
-        private static HttpRequestMessage Notification(string dataId, string type, string? signatureSecret)
+        /// <summary>Como lo envía Mercado Pago: el data.id va firmado en minúsculas aunque llegue en mayúsculas.</summary>
+        private static HttpRequestMessage Notification(string dataId, string type, string? signatureSecret, bool signLowercaseId = true)
         {
             const string requestId = "req-integration-1";
             var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
-            var manifest = $"id:{dataId};request-id:{requestId};ts:{ts};";
+            var manifest = $"id:{(signLowercaseId ? dataId.ToLowerInvariant() : dataId)};request-id:{requestId};ts:{ts};";
             var hash = Convert.ToHexString(HMACSHA256.HashData(
                 Encoding.UTF8.GetBytes(signatureSecret ?? "otra-firma"), Encoding.UTF8.GetBytes(manifest))).ToLowerInvariant();
 
@@ -145,6 +146,19 @@ namespace AuraNova.IntegrationTests
             Assert.Equal(OrderStatus.PaymentConfirmed, order.Status);
             Assert.Equal(50m, payment.AmountPaid);
             Assert.Equal(["processed", "processed"], await WebhookResults(factory));
+        }
+
+        [Fact]
+        public async Task SignatureWithIdAsReceived_IsAlsoAccepted()
+        {
+            var (factory, _, orderId) = Setup();
+            using var client = factory.CreateClient();
+
+            var response = await client.SendAsync(Notification(MpOrderId, "order", Secret, signLowercaseId: false));
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var (order, _) = await Load(factory, orderId);
+            Assert.Equal(OrderStatus.PaymentConfirmed, order.Status);
         }
 
         [Fact]
