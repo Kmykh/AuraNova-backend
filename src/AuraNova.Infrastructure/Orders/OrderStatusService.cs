@@ -52,6 +52,9 @@ namespace AuraNova.Infrastructure.Orders
                 throw new OrderValidationException(
                     $"Transición inválida: {oldStatus} → {newStatus} para tipo de entrega {order.DeliveryType}.");
 
+            // Con solo el adelanto pagado, el pedido no sale hasta que se pague el saldo
+            OrderBalance.EnsurePaidBeforeHandover(order, newStatus);
+
             // Sin precio no hay cotización: se usa "Enviar cotización", que guarda el total
             if (newStatus == OrderStatus.QuoteReady && order.Total is not > 0)
                 throw new OrderValidationException(

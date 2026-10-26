@@ -39,6 +39,7 @@ namespace AuraNova.Infrastructure.Notifications
                 var order = await _db.Orders
                     .Include(o => o.Customer)
                     .Include(o => o.Quote)
+                    .Include(o => o.Payment)
                     .FirstOrDefaultAsync(o => o.Id == orderId);
 
                 if (order == null || order.Customer == null)
