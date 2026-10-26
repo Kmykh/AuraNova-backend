@@ -11,5 +11,12 @@ namespace AuraNova.Application.Storage.Interfaces
 
         /// <summary>Sube un archivo de imagen enviado por el formulario (multipart) y devuelve su ruta.</summary>
         Task<string> PersistFileAsync(Stream content, string contentType, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Guarda la foto que el cliente eligió como fondo de su tarjeta (data URL) en el bucket privado
+        /// y devuelve su ruta. Se valida, se le quitan los metadatos y se re-codifica en WebP.
+        /// </summary>
+        /// <exception cref="InvalidImageException">No es una imagen válida o excede el tamaño permitido.</exception>
+        Task<string> PersistCardBackgroundAsync(string dataUrl, CancellationToken cancellationToken = default);
     }
 }

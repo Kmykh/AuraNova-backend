@@ -134,6 +134,12 @@ namespace AuraNova.Application.AdminOrders.DTOs
         public bool HasPhraseCard { get; set; }
         public string? PhraseText { get; set; }
         public string? PhraseFont { get; set; }
+        public string? PhraseTo { get; set; }
+        public string? PhraseFrom { get; set; }
+        /// <summary>marfil, rosa, pergamino, noir, salvia o foto.</summary>
+        public string? PhraseTheme { get; set; }
+        /// <summary>Foto de fondo que subió el cliente (URL firmada y temporal).</summary>
+        public string? CardBackgroundUrl { get; set; }
         public string? AppliedCampaignName { get; set; }
         public string? AppliedCampaignStageName { get; set; }
     }

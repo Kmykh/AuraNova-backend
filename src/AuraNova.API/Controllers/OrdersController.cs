@@ -16,6 +16,7 @@ namespace AuraNova.API.Controllers
         private const int MaxReferenceImages = 5;
         private const long MaxReferenceImageBytes = 10 * 1024 * 1024;
         private const long MaxCustomOrderUploadBytes = 55 * 1024 * 1024;
+        private const int MaxCardPhotos = 3;
 
         private static readonly JsonSerializerOptions FormJsonOptions = new(JsonSerializerDefaults.Web)
         {
@@ -63,18 +64,32 @@ namespace AuraNova.API.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
+            var withPhoto = request.Items.Where(i => i.HasPhraseCard && !string.IsNullOrWhiteSpace(i.CardBackgroundImage)).ToList();
+            if (withPhoto.Count > MaxCardPhotos)
+                return BadRequest(new { message = $"Puedes usar tu propia foto en hasta {MaxCardPhotos} tarjetas por pedido." });
+
+            var uploaded = new List<string>();
             try
             {
+                // Fondos propios de las tarjetas: se guardan en el bucket privado y el pedido solo guarda la ruta
+                foreach (var item in withPhoto)
+                {
+                    item.CardBackgroundPath = await _referenceImages.PersistCardBackgroundAsync(item.CardBackgroundImage!, HttpContext.RequestAborted);
+                    uploaded.Add(item.CardBackgroundPath);
+                }
+
                 var result = await _orderService.CreateAsync(request);
                 return StatusCode(201, result);
             }
-            catch (OrderNotFoundException ex)
+            catch (Exception ex) when (ex is InvalidImageException or OrderValidationException or OrderNotFoundException)
             {
-                return NotFound(new { message = ex.Message });
-            }
-            catch (OrderValidationException ex)
-            {
-                return BadRequest(new { message = ex.Message });
+                // El pedido no se creó: no deben quedar fotos sueltas en el bucket
+                foreach (var path in uploaded)
+                    await _storage.DeleteAsync(path);
+
+                return ex is OrderNotFoundException
+                    ? NotFound(new { message = ex.Message })
+                    : BadRequest(new { message = ex.Message });
             }
         }
 

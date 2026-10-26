@@ -14,8 +14,15 @@ namespace AuraNova.Infrastructure.Orders
         bool HasButterfly,
         bool HasPhraseCard,
         string? PhraseText,
-        string? PhraseFont)
+        string? PhraseFont,
+        string? PhraseTo = null,
+        string? PhraseFrom = null,
+        string? PhraseTheme = null,
+        string? CardBackgroundPath = null)
     {
+        /// <summary>Diseños de tarjeta que ofrece la web ("foto" = fondo subido por el cliente).</summary>
+        public static readonly string[] CardThemes = ["marfil", "rosa", "pergamino", "noir", "salvia", "foto"];
+
         /// <summary>El cliente deja que el taller combine los colores.</summary>
         public const string MixedColors = "Surtido multicolor";
 
@@ -56,6 +63,13 @@ namespace AuraNova.Infrastructure.Orders
             if (font is { Length: > MaxOptionLength })
                 font = font[..MaxOptionLength];
 
+            var theme = hasPhraseCard ? item.PhraseTheme?.Trim().ToLowerInvariant() : null;
+            if (theme != null && !CardThemes.Contains(theme))
+                theme = null;
+            var background = hasPhraseCard ? item.CardBackgroundPath : null;
+            if (theme == "foto" && background == null)
+                theme = null;
+
             return new OrderItemOptions(
                 resolvedColors,
                 resolvedFlowers,
@@ -63,12 +77,24 @@ namespace AuraNova.Infrastructure.Orders
                 item.HasButterfly && product.AllowsButterfly,
                 hasPhraseCard,
                 string.IsNullOrEmpty(phrase) ? null : phrase,
-                string.IsNullOrEmpty(font) ? null : font);
+                string.IsNullOrEmpty(font) ? null : font,
+                hasPhraseCard ? Clean(item.PhraseTo, 60) : null,
+                hasPhraseCard ? Clean(item.PhraseFrom, 60) : null,
+                theme,
+                background);
+        }
+
+        private static string? Clean(string? value, int max)
+        {
+            var trimmed = value?.Trim();
+            if (string.IsNullOrEmpty(trimmed)) return null;
+            return trimmed.Length <= max ? trimmed : trimmed[..max];
         }
 
         /// <summary>Clave para reconocer el mismo producto con la misma personalización.</summary>
         public string Key => string.Join("|",
-            string.Join(",", Colors), string.Join(",", FlowerTypes), HasLights, HasButterfly, HasPhraseCard, PhraseText, PhraseFont);
+            string.Join(",", Colors), string.Join(",", FlowerTypes), HasLights, HasButterfly, HasPhraseCard, PhraseText, PhraseFont,
+            PhraseTo, PhraseFrom, PhraseTheme, CardBackgroundPath);
 
         /// <summary>Lista nueva si viene; si no, los campos de texto anteriores (que podían traer comas).</summary>
         private static List<string> Pick(List<string>? list, string?[] legacy)

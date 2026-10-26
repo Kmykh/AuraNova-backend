@@ -202,7 +202,8 @@ namespace AuraNova.Infrastructure.Orders
 
             // Customer files (reference, shipping proof, payment evidence) are private: signed, short-lived URLs
             var fileUrls = await _storage.GetReadUrlsAsync(CustomOrderBrief.StoredPaths(order)
-                .Concat(new[] { order.ReferenceImageUrl, order.ShippingProofUrl, order.Payment?.EvidenceUrl }.OfType<string>()));
+                .Concat(new[] { order.ReferenceImageUrl, order.ShippingProofUrl, order.Payment?.EvidenceUrl }.OfType<string>())
+                .Concat((order.Items ?? []).Select(i => i.CardBackgroundPath).OfType<string>()));
             string? FileUrl(string? stored) => stored == null ? null : fileUrls.GetValueOrDefault(stored);
 
             var response = new AdminOrderDetailResponse
@@ -273,6 +274,10 @@ namespace AuraNova.Infrastructure.Orders
                     HasPhraseCard = i.HasPhraseCard,
                     PhraseText = i.PhraseText,
                     PhraseFont = i.PhraseFont,
+                    PhraseTo = i.PhraseTo,
+                    PhraseFrom = i.PhraseFrom,
+                    PhraseTheme = i.PhraseTheme,
+                    CardBackgroundUrl = FileUrl(i.CardBackgroundPath),
                     AppliedCampaignName = i.AppliedCampaignName,
                     AppliedCampaignStageName = i.AppliedCampaignStageName
                 }).ToList() ?? new List<AdminOrderItem>(),

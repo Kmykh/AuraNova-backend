@@ -222,6 +222,10 @@ namespace AuraNova.Infrastructure.Orders
                         HasPhraseCard = options.HasPhraseCard,
                         PhraseText = options.PhraseText,
                         PhraseFont = options.PhraseFont,
+                        PhraseTo = options.PhraseTo,
+                        PhraseFrom = options.PhraseFrom,
+                        PhraseTheme = options.PhraseTheme,
+                        CardBackgroundPath = options.CardBackgroundPath,
                         
                         // Campaign tracking context
                         CampaignId = priceResult.CampaignId,

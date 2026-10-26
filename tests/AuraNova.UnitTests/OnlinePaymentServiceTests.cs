@@ -242,6 +242,31 @@ namespace AuraNova.UnitTests
         }
 
         [Fact]
+        public async Task ReturningBuyer_IsRecognizedByPhone_ForMercadoPagoHistory()
+        {
+            using var db = GetDb();
+            // Pedido anterior pagado: cada pedido crea su propio cliente, con el mismo celular
+            var firstVisit = DateTimeOffset.UtcNow.AddMonths(-2);
+            var previousCustomer = new Customer { Name = "María", Phone = "987654321", CreatedAt = firstVisit };
+            var previous = new Order
+            {
+                OrderCode = "AN-0999", Customer = previousCustomer, CustomerId = previousCustomer.Id, CreatedAt = firstVisit,
+                Status = OrderStatus.Delivered, DeliveryType = DeliveryType.Delivery, Subtotal = 40m, Total = 40m
+            };
+            db.Orders.Add(previous);
+            db.Payments.Add(new Payment { OrderId = previous.Id, Amount = 40m, AmountPaid = 40m, Status = PaymentStatus.Confirmed });
+            await db.SaveChangesAsync();
+
+            var order = await SeedOrder(db, total: 100m);
+            var (service, gateway, _) = Build(db);
+            await service.PayAsync(order.Id, Card(payFull: true));
+
+            var history = gateway.Created.Single().History!;
+            Assert.Equal(firstVisit, history.RegisteredAt);
+            Assert.Equal(firstVisit, history.LastPurchaseAt);
+        }
+
+        [Fact]
         public async Task Refund_Partial_ThenRest_ReducesWhatWasPaid()
         {
             using var db = GetDb();

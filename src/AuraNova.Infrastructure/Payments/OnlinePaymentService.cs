@@ -93,10 +93,7 @@ namespace AuraNova.Infrastructure.Payments
             if (documentNumber.Length == 0) documentNumber = null;
 
             var (firstName, lastName) = MercadoPagoOrderData.SplitName(order.Customer?.Name);
-            var history = order.Customer == null ? null : new GatewayBuyerHistory(
-                order.Customer.CreatedAt,
-                await LastPurchaseAsync(order, cancellationToken),
-                LocalPickup: order.DeliveryType == DeliveryType.MeetingPoint);
+            var history = order.Customer == null ? null : await BuyerHistoryAsync(order, cancellationToken);
 
             var transaction = new PaymentTransaction
             {
@@ -552,11 +549,23 @@ namespace AuraNova.Infrastructure.Payments
 
         private static string MethodName(PaymentTransaction transaction) => transaction.MethodId == "yape" ? "Yape" : "tarjeta";
 
-        /// <summary>Fecha del último pedido pagado del mismo cliente (null si es su primera compra).</summary>
-        private async Task<DateTimeOffset?> LastPurchaseAsync(Order order, CancellationToken cancellationToken) =>
-            await db.Orders
-                .Where(o => o.CustomerId == order.CustomerId && o.Id != order.Id && o.Payment != null && o.Payment.AmountPaid > 0)
+        /// <summary>
+        /// Historial del comprador: cada pedido crea su propio registro de cliente, así que se le reconoce
+        /// por el celular (primer pedido = fecha de registro; último pedido pagado = última compra).
+        /// </summary>
+        private async Task<GatewayBuyerHistory> BuyerHistoryAsync(Order order, CancellationToken cancellationToken)
+        {
+            var phone = order.Customer!.Phone;
+            var sameBuyer = db.Orders.Where(o => o.Id != order.Id && (o.CustomerId == order.CustomerId || o.Customer!.Phone == phone));
+
+            var firstSeen = await sameBuyer.MinAsync(o => (DateTimeOffset?)o.CreatedAt, cancellationToken);
+            var lastPurchase = await sameBuyer
+                .Where(o => o.Payment != null && o.Payment.AmountPaid > 0)
                 .MaxAsync(o => (DateTimeOffset?)o.CreatedAt, cancellationToken);
+
+            var registeredAt = firstSeen is { } first && first < order.Customer.CreatedAt ? first : order.Customer.CreatedAt;
+            return new GatewayBuyerHistory(registeredAt, lastPurchase, LocalPickup: order.DeliveryType == DeliveryType.MeetingPoint);
+        }
 
         private static (string Id, string Type) ResolveMethod(CreateOnlinePaymentRequest request)
         {
