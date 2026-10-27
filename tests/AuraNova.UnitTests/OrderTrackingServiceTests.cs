@@ -46,6 +46,100 @@ namespace AuraNova.UnitTests
             return order;
         }
 
+        // =====================================================================
+        // DINERO DEL CLIENTE: pagado, devuelto o por devolver
+        // =====================================================================
+
+        private static async Task<Order> SeedPaidOrder(AppDbContext db, OrderStatus status, params PaymentTransaction[] transactions)
+        {
+            var customer = new Customer { Name = "Lucía Torres", Phone = "988777666" };
+            db.Customers.Add(customer);
+            var order = new Order { CustomerId = customer.Id, OrderCode = "AN-1040", Status = status, DeliveryType = DeliveryType.Delivery, Subtotal = 80m, DeliveryCost = 7m, Total = 87m };
+            db.Orders.Add(order);
+            var payment = new Payment { OrderId = order.Id, Amount = 87m, Method = PaymentMethod.MercadoPago, Status = PaymentStatus.Confirmed };
+            db.Payments.Add(payment);
+            foreach (var t in transactions)
+            {
+                t.PaymentId = payment.Id;
+                t.OrderId = order.Id;
+                db.PaymentTransactions.Add(t);
+            }
+            payment.AmountPaid = transactions.Where(t => t.ApprovedAt != null).Sum(t => t.Amount - t.RefundedAmount);
+            await db.SaveChangesAsync();
+            return order;
+        }
+
+        [Fact]
+        public async Task Tracking_CancelledAndRefunded_ExplainsTheRefundWithoutTeamNotes()
+        {
+            using var db = GetInMemoryDb();
+            var paidAt = DateTimeOffset.UtcNow.AddDays(-2);
+            var order = await SeedPaidOrder(db, OrderStatus.Cancelled, new PaymentTransaction
+            {
+                MethodId = "yape", Amount = 43.50m, IsDeposit = true, Status = "refunded", ApprovedAt = paidAt,
+                RefundedAmount = 43.50m, RefundedAt = paidAt.AddDays(1)
+            });
+            db.OrderStatusHistory.AddRange(
+                new OrderStatusHistory { OrderId = order.Id, Status = OrderStatus.WaitingPayment, CreatedAt = paidAt.AddMinutes(-5) },
+                new OrderStatusHistory { OrderId = order.Id, Status = OrderStatus.PaymentConfirmed, CreatedAt = paidAt, Comment = "Adelanto pagado con Yape (Mercado Pago): S/ 43.50. Saldo pendiente: S/ 43.50." },
+                new OrderStatusHistory { OrderId = order.Id, Status = OrderStatus.Cancelled, CreatedAt = paidAt.AddHours(20), Comment = "Cancelado: Nos quedamos sin girasoles" },
+                new OrderStatusHistory { OrderId = order.Id, Status = OrderStatus.Cancelled, CreatedAt = paidAt.AddDays(1), Comment = "Devolución de S/ 43.50 (Yape) por Mercado Pago. Motivo: pedido cancelado" });
+            await db.SaveChangesAsync();
+
+            var result = await new OrderTrackingService(db, new TestStorage()).GetTrackingAsync(order.OrderCode, order.TrackingToken);
+
+            Assert.Equal("refunded", result!.Payment.State);
+            Assert.Equal(43.50m, result.Payment.Refunded);
+            Assert.Equal(0m, result.Payment.NetPaid);
+            Assert.Equal(["payment", "refund"], result.Payment.Movements.Select(m => m.Kind));
+            Assert.All(result.Payment.Movements, m => Assert.Equal("Yape", m.Method));
+
+            Assert.DoesNotContain(result.Timeline, i => i.Description?.StartsWith("Devolución") == true);
+            Assert.Equal("Adelanto pagado", result.Timeline.Single(i => i.Kind == "payment").Label);
+            Assert.Equal("Motivo: Nos quedamos sin girasoles", result.Timeline.Single(i => i.Kind == "cancelled").Description);
+            var refund = result.Timeline.Last();
+            Assert.Equal("refund", refund.Kind);
+            Assert.Equal("S/ 43.50 a tu Yape.", refund.Description);
+        }
+
+        [Fact]
+        public async Task Tracking_CancelledWithMoneyStillPaid_IsPendingRefund()
+        {
+            using var db = GetInMemoryDb();
+            var order = await SeedPaidOrder(db, OrderStatus.Cancelled, new PaymentTransaction
+            {
+                MethodId = "debvisa", Amount = 87m, Status = "processed", ApprovedAt = DateTimeOffset.UtcNow.AddHours(-1)
+            });
+            db.OrderStatusHistory.Add(new OrderStatusHistory { OrderId = order.Id, Status = OrderStatus.Cancelled, Comment = "Se aprobó un pago de S/ 87.00 con el pedido cancelado. Devuélvelo desde Pagos." });
+            await db.SaveChangesAsync();
+
+            var result = await new OrderTrackingService(db, new TestStorage()).GetTrackingAsync(order.OrderCode, order.TrackingToken);
+
+            Assert.Equal("refund_pending", result!.Payment.State);
+            Assert.Equal(87m, result.Payment.NetPaid);
+            Assert.Equal(0m, result.Payment.BalanceDue);
+            Assert.Equal("Visa", result.Payment.Movements.Single().Method);
+            Assert.DoesNotContain(result.Timeline, i => i.Description?.Contains("Devuélvelo") == true);
+        }
+
+        [Theory]
+        [InlineData(43.50, "deposit", 43.50)]
+        [InlineData(87, "paid", 0)]
+        public async Task Tracking_ActiveOrder_ShowsWhatWasPaidAndWhatIsMissing(double paid, string state, double due)
+        {
+            using var db = GetInMemoryDb();
+            var order = await SeedPaidOrder(db, OrderStatus.Preparing, new PaymentTransaction
+            {
+                MethodId = "master", Amount = (decimal)paid, IsDeposit = paid < 87, Status = "processed", ApprovedAt = DateTimeOffset.UtcNow
+            });
+
+            var result = await new OrderTrackingService(db, new TestStorage()).GetTrackingAsync(order.OrderCode, order.TrackingToken);
+
+            Assert.Equal(state, result!.Payment.State);
+            Assert.Equal((decimal)due, result.Payment.BalanceDue);
+            Assert.Equal("Mastercard", result.Payment.Movements.Single().Method);
+        }
+
         [Fact]
         public async Task GetTrackingAsync_CorrectToken_ShouldReturnTracking()
         {

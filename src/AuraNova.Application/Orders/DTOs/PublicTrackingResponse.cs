@@ -29,6 +29,8 @@ namespace AuraNova.Application.Orders.DTOs
         public string? BudgetRange { get; set; }
 
         public PublicTrackingCosts Costs { get; set; } = new();
+        /// <summary>Lo cobrado y lo devuelto, con medio y fecha: lo que el cliente necesita saber de su dinero.</summary>
+        public PublicTrackingPayment Payment { get; set; } = new();
         public PublicTrackingEstimates Estimates { get; set; } = new();
         public PublicTrackingNationalShipping? NationalShippingDetails { get; set; }
 
@@ -46,6 +48,36 @@ namespace AuraNova.Application.Orders.DTOs
         /// <summary>Lo pagado con Mercado Pago y lo que falta (con el adelanto del 50%).</summary>
         public decimal AmountPaid { get; set; }
         public decimal BalanceDue { get; set; }
+    }
+
+    public class PublicTrackingPayment
+    {
+        /// <summary>
+        /// unpaid (falta pagar), processing (Mercado Pago lo está confirmando), deposit (adelanto pagado),
+        /// paid (pagado completo), none (cancelado sin cobro), refund_pending (cancelado con dinero por devolver),
+        /// refunded (cancelado y devuelto).
+        /// </summary>
+        public string State { get; set; } = "unpaid";
+        public decimal Total { get; set; }
+        /// <summary>Todo lo cobrado (aprobado), antes de devoluciones.</summary>
+        public decimal Charged { get; set; }
+        public decimal Refunded { get; set; }
+        /// <summary>Lo que el negocio tiene del cliente: cobrado menos devuelto.</summary>
+        public decimal NetPaid { get; set; }
+        public decimal BalanceDue { get; set; }
+        public List<PublicTrackingMoneyMovement> Movements { get; set; } = new();
+    }
+
+    /// <summary>Un cobro o una devolución: "S/ 25.00 con Yape el 27 oct".</summary>
+    public class PublicTrackingMoneyMovement
+    {
+        /// <summary>payment o refund.</summary>
+        public string Kind { get; set; } = "payment";
+        public decimal Amount { get; set; }
+        /// <summary>Yape, Visa, Mastercard…</summary>
+        public string Method { get; set; } = null!;
+        public bool IsDeposit { get; set; }
+        public DateTimeOffset? Date { get; set; }
     }
 
     public class PublicTrackingEstimates
@@ -90,6 +122,8 @@ namespace AuraNova.Application.Orders.DTOs
     public class TrackingTimelineItem
     {
         public string Status { get; set; } = null!;
+        /// <summary>status, payment, refund, rejection o cancelled: cómo mostrarlo.</summary>
+        public string Kind { get; set; } = "status";
         public string Label { get; set; } = null!;
         public string? Description { get; set; }
         public bool Completed { get; set; }
