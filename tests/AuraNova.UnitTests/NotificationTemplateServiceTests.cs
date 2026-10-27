@@ -25,7 +25,7 @@ namespace AuraNova.UnitTests
         }
 
         [Fact]
-        public async Task BuildOrderCreatedMessageAsync_Delivery_ShouldContainYapeInstructions()
+        public async Task BuildOrderCreatedMessageAsync_Delivery_ExplainsHowToPay()
         {
             var settingsMock = new Mock<IBusinessSettingsService>();
             settingsMock.Setup(s => s.GetPublicAsync()).ReturnsAsync(new BusinessSettingsResponse { BusinessName = "Aura Nova" });
@@ -35,13 +35,17 @@ namespace AuraNova.UnitTests
 
             var message = await service.BuildOrderCreatedMessageAsync(order);
 
-            Assert.Contains("María", message);
+            Assert.Contains("Hola María,", message);
             Assert.Contains("PED-2026-000001", message);
             Assert.Contains("150.50", message);
+            Assert.Contains("Adelanto (50 %): S/ 75.25", message);
+            Assert.Contains("tarjeta o Yape", message);
+            Assert.Contains($"/pago/{order.Id}", message);
+            Assert.DoesNotContain("evidencia", message);
         }
 
         [Fact]
-        public async Task BuildOrderCreatedMessageAsync_NationalShipping_ShouldContainQuoteInstructions()
+        public async Task BuildOrderCreatedMessageAsync_NationalShipping_SaysTheAgencyIsPaidAtDestination()
         {
             var settingsMock = new Mock<IBusinessSettingsService>();
             settingsMock.Setup(s => s.GetPublicAsync()).ReturnsAsync(new BusinessSettingsResponse { BusinessName = "Aura Nova" });
@@ -53,7 +57,8 @@ namespace AuraNova.UnitTests
 
             Assert.Contains("María", message);
             Assert.Contains("PED-2026-000001", message);
-            Assert.Contains("nivel nacional", message);
+            Assert.Contains("lo pagas al recoger tu pedido en destino", message);
+            Assert.DoesNotContain("cotización", message);
         }
 
         [Fact]

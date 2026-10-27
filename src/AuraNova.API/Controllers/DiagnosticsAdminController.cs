@@ -101,9 +101,12 @@ namespace AuraNova.API.Controllers
             try
             {
                 var sender = services.GetRequiredService<IEmailSender>();
-                const string text = "Este es un correo de prueba de Aura Nova. Si lo recibes, los correos automáticos funcionan.";
-                await sender.SendAsync(request.To.Trim(), "Correo de prueba · Aura Nova",
-                    EmailTemplate.Render("Aura Nova", "Correo de prueba", text, "Ir a la tienda", null), text, null, cancellationToken);
+                const string text = "Hola,\n\nEste es un correo de prueba. Si lo recibes, los correos automáticos a tus clientes funcionan.\n\nGracias por elegir Aura Nova";
+                var site = services.GetService<IOptions<AuraNova.Infrastructure.Notifications.PublicSiteSettings>>()?.Value.BaseUrl
+                    ?? new AuraNova.Infrastructure.Notifications.PublicSiteSettings().BaseUrl;
+                var html = EmailTemplate.Render(new EmailBrand("Aura Nova", site, null),
+                    new EmailLayout("Prueba", "Correo de prueba", "Funciona", EmailTone.Success, "Ir a la tienda", site), text);
+                await sender.SendAsync(request.To.Trim(), "Correo de prueba · Aura Nova", html, text, null, cancellationToken);
                 return Ok(new { ok = true, provider = settings.ProviderName, message = $"Enviado a {request.To.Trim()}. Revisa la bandeja (y Spam)." });
             }
             catch (EmailSendException ex)

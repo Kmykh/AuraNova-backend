@@ -139,31 +139,33 @@ namespace AuraNova.Infrastructure.Notifications
             {
                 NotificationType.QuoteReady or NotificationType.PaymentRejected => true,
                 NotificationType.OrderCreated => order.Status == OrderStatus.WaitingPayment,
-                NotificationType.PaymentConfirmed or NotificationType.OrderReady => BalanceDue(order) > 0,
+                // Tras el adelanto lo siguiente es seguir el pedido; el saldo se cobra cuando esté listo
+                NotificationType.OrderReady => BalanceDue(order) > 0,
                 _ => false
             };
             return needsPayment ? $"{_siteUrl}/pago/{order.Id}" : $"{_siteUrl}/seguimiento/{order.TrackingToken}";
         }
 
-        public static string EmailSubject(NotificationType type, Order order) => type switch
+        /// <summary>Asunto "Título · AN-1005": el correo usa la parte del título como encabezado (ver EmailCopy).</summary>
+        public static string EmailSubject(NotificationType type, Order order)
         {
-            NotificationType.OrderCreated => order.IsCustomOrder
-                ? $"Recibimos tu pedido personalizado {order.OrderCode}"
-                : $"Tu pedido {order.OrderCode} está registrado",
-            NotificationType.QuoteReady => $"Tu cotización del pedido {order.OrderCode} está lista",
-            NotificationType.PaymentReported => $"Recibimos tu comprobante · {order.OrderCode}",
-            NotificationType.PaymentConfirmed => $"¡Pago confirmado! Pedido {order.OrderCode}",
-            NotificationType.BalancePaid => $"¡Pedido pagado por completo! {order.OrderCode}",
-            NotificationType.PaymentRejected => $"No pudimos validar tu pago · {order.OrderCode}",
-            NotificationType.OrderPreparing => $"Tu pedido {order.OrderCode} está en el taller",
-            NotificationType.OrderReady => BalanceDue(order) > 0
-                ? $"Tu pedido {order.OrderCode} está listo: falta el saldo"
-                : $"Tu pedido {order.OrderCode} está listo",
-            NotificationType.OrderShipped => $"Tu pedido {order.OrderCode} va en camino",
-            NotificationType.OrderDelivered => $"¡Tu pedido {order.OrderCode} fue entregado!",
-            NotificationType.OrderCancelled => $"Tu pedido {order.OrderCode} fue cancelado",
-            _ => $"Novedades de tu pedido {order.OrderCode}"
-        };
+            var title = type switch
+            {
+                NotificationType.OrderCreated => order.IsCustomOrder ? "¡Recibimos tu idea!" : "Tu pedido está reservado",
+                NotificationType.QuoteReady => "Tu cotización está lista",
+                NotificationType.PaymentReported => "Recibimos tu comprobante",
+                NotificationType.PaymentConfirmed => BalanceDue(order) > 0 ? "¡Recibimos tu adelanto!" : "¡Tu pedido está pagado!",
+                NotificationType.BalancePaid => "¡Pagaste tu pedido por completo!",
+                NotificationType.PaymentRejected => "No pudimos validar tu pago",
+                NotificationType.OrderPreparing => "Tu pedido está en el taller",
+                NotificationType.OrderReady => "¡Tu pedido está listo!",
+                NotificationType.OrderShipped => "Tu pedido va en camino",
+                NotificationType.OrderDelivered => "¡Tu pedido fue entregado!",
+                NotificationType.OrderCancelled => "Tu pedido fue cancelado",
+                _ => "Novedades de tu pedido"
+            };
+            return $"{title}{Email.EmailCopy.SubjectSeparator}{order.OrderCode}";
+        }
 
         public async Task<bool> ResendEmailAsync(Guid notificationId)
         {
