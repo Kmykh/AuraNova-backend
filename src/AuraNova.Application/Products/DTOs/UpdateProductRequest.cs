@@ -25,5 +25,9 @@ namespace AuraNova.Application.Products.DTOs
         public bool AllowsLights { get; set; } = false;
         public bool AllowsButterfly { get; set; } = false;
         public bool AllowsPhraseCard { get; set; } = false;
+
+        /// <summary>Cuántos colores y tipos de flor puede elegir el cliente (1 = flor por unidad). Vacío = sin límite propio.</summary>
+        [System.ComponentModel.DataAnnotations.Range(1, 5)]
+        public int? MaxChoices { get; set; }
     }
 }

@@ -26,6 +26,12 @@ namespace AuraNova.Domain.Entities
         public bool AllowsButterfly { get; set; } = false;
         public bool AllowsPhraseCard { get; set; } = false;
 
+        /// <summary>
+        /// Cuántos colores y tipos de flor puede elegir el cliente. 1 = flor por unidad (un solo color);
+        /// null = sin límite propio (hasta el máximo general).
+        /// </summary>
+        public int? MaxChoices { get; set; }
+
         /// <summary>Galería ordenada; la primera es la portada (igual a <see cref="ImageUrl"/>).</summary>
         public ICollection<ProductImage>? Images { get; set; }
 
