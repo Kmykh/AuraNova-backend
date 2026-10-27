@@ -160,6 +160,8 @@ builder.Services.AddScoped<AuraNova.Application.Payments.Interfaces.IPaymentServ
 
 // Pagos en la página con Mercado Pago (Checkout API, API de Orders). Access Token y firma solo por variables de entorno.
 builder.Services.Configure<AuraNova.Infrastructure.Payments.MercadoPagoSettings>(builder.Configuration.GetSection("MercadoPago"));
+// El SDK espera 30 s por defecto y un Yape puede tardar más en confirmarse: se da más margen
+MercadoPago.Config.MercadoPagoConfig.HttpClient = new MercadoPago.Http.DefaultHttpClient(new HttpClient { Timeout = TimeSpan.FromSeconds(90) });
 builder.Services.AddScoped<AuraNova.Infrastructure.Payments.IMercadoPagoGateway, AuraNova.Infrastructure.Payments.MercadoPagoGateway>();
 builder.Services.AddScoped<AuraNova.Application.OnlinePayments.Interfaces.IOnlinePaymentService, AuraNova.Infrastructure.Payments.OnlinePaymentService>();
 

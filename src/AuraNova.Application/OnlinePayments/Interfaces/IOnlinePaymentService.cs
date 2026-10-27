@@ -13,6 +13,9 @@ namespace AuraNova.Application.OnlinePayments.Interfaces
         /// <summary>Devuelve un cobro aprobado (total o parcial) y lo descuenta de lo pagado.</summary>
         Task<RefundOnlinePaymentResult> RefundAsync(Guid orderId, Guid transactionId, RefundOnlinePaymentRequest request, CancellationToken cancellationToken = default);
 
+        /// <summary>Revisa ya en Mercado Pago los cobros sin aprobar de un pedido (botón "Verificar con Mercado Pago").</summary>
+        Task<int> ReconcileOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
+
         /// <summary>Al cancelar un pedido: anula en Mercado Pago los cobros que aún esperan una acción del cliente.</summary>
         Task CancelPendingAsync(Guid orderId, CancellationToken cancellationToken = default);
 

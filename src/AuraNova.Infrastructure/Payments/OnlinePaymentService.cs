@@ -27,6 +27,8 @@ namespace AuraNova.Infrastructure.Payments
     {
         // Un cobro "en proceso" bloquea otro intento durante este tiempo (evita pagar dos veces)
         private static readonly TimeSpan PendingLock = TimeSpan.FromMinutes(15);
+        // Intento sin order en Mercado Pago (no respondió a tiempo o era un envío repetido): se espera poco
+        private static readonly TimeSpan UnknownOutcomeLock = TimeSpan.FromMinutes(3);
         private static readonly string[] UnresolvedStatuses = ["created", "processing", "action_required"];
         private static readonly Regex MethodIdPattern = new("^[a-z_]{2,30}$", RegexOptions.Compiled);
 
@@ -66,13 +68,19 @@ namespace AuraNova.Infrastructure.Payments
                     ? "Primero acepta la cotización para poder pagar."
                     : "Este pedido no está esperando un pago.");
 
-            if (payment.Transactions?.Any(t => t.ApprovedAt == null && t.Status is "processing" or "action_required" &&
-                                               t.CreatedAt > DateTimeOffset.UtcNow - PendingLock) == true)
-                throw new OnlinePaymentException("Tienes un pago en proceso. Espera unos minutos antes de intentar de nuevo.");
-
             // El servidor decide cuánto se cobra: adelanto, total o saldo
             var isDeposit = isFirstPayment && !request.PayFull;
             var amount = isFirstPayment ? (isDeposit ? DepositFor(payment.Amount) : payment.Amount) : balance;
+
+            // Otro intento de este pedido se está enviando ahora mismo (doble toque en "Pagar"): no se manda otro;
+            // la página espera la confirmación del primero
+            var now = DateTimeOffset.UtcNow;
+            if (payment.Transactions?.Any(t => t.ApprovedAt == null && t.Status == "created" && t.CreatedAt > now.AddMinutes(-2)) == true)
+                return InProgress(order, payment, amount);
+
+            if (payment.Transactions?.Any(t => t.ApprovedAt == null && t.Status is "processing" or "action_required" &&
+                                               t.CreatedAt > now - (t.ExternalOrderId == null ? UnknownOutcomeLock : PendingLock)) == true)
+                throw new OnlinePaymentException("Tienes un pago en proceso. Espera unos minutos antes de intentar de nuevo.");
 
             var (methodId, methodType) = ResolveMethod(request);
             var email = (request.PayerEmail ?? order.Customer?.Email)?.Trim();
@@ -126,7 +134,8 @@ namespace AuraNova.Infrastructure.Payments
                     PaymentMethodType: methodType,
                     Token: request.Token.Trim(),
                     Installments: request.Installments,
-                    IdempotencyKey: MercadoPagoGateway.IdempotencyKeyFor(request.Token.Trim()),
+                    // Por pedido y token: un doble envío no cobra dos veces y otro pedido nunca comparte la clave
+                    IdempotencyKey: MercadoPagoGateway.IdempotencyKeyFor($"{order.Id:N}:{request.Token.Trim()}"),
                     PayerFirstName: firstName,
                     PayerLastName: lastName,
                     PayerAddress: MercadoPagoOrderData.PayerAddress(order),
@@ -134,6 +143,15 @@ namespace AuraNova.Infrastructure.Payments
                     ShipmentAddress: MercadoPagoOrderData.ShipmentAddress(order),
                     History: history,
                     DeviceId: request.DeviceId?.Trim()), cancellationToken);
+            }
+            catch (MercadoPagoInProgressException ex)
+            {
+                // No se sabe si cobró: queda en proceso y la conciliación lo confirma (o lo descarta) con Mercado Pago
+                transaction.Status = "processing";
+                transaction.StatusDetail = Truncate(ex.Detail ?? ex.Message, 100);
+                transaction.UpdatedAt = DateTimeOffset.UtcNow;
+                await db.SaveChangesAsync(cancellationToken);
+                return InProgress(order, payment, amount);
             }
             catch (MercadoPagoGatewayException ex)
             {
@@ -281,6 +299,62 @@ namespace AuraNova.Infrastructure.Payments
                 await db.SaveChangesAsync(cancellationToken);
         }
 
+        /// <summary>Consulta un cobro en Mercado Pago y aplica lo que diga. Devuelve true si cambió su estado.</summary>
+        private async Task<bool> ReconcileAsync(PaymentTransaction transaction, DateTimeOffset now, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var before = transaction.Status;
+                var result = transaction.ExternalOrderId != null
+                    ? await gateway.GetOrderAsync(transaction.ExternalOrderId, cancellationToken)
+                    : await gateway.FindByExternalReferenceAsync(transaction.Id.ToString("N"), cancellationToken);
+
+                if (result == null)
+                {
+                    if (transaction.ExternalOrderId == null && transaction.CreatedAt < now.AddMinutes(-30))
+                    {
+                        transaction.Status = "error";
+                        transaction.StatusDetail = "Mercado Pago no registró este intento.";
+                        transaction.UpdatedAt = now;
+                        await db.SaveChangesAsync(cancellationToken);
+                        return true;
+                    }
+                    return false;
+                }
+
+                var order = await db.Orders
+                    .Include(o => o.Payment!).ThenInclude(p => p.Transactions)
+                    .FirstAsync(o => o.Id == transaction.OrderId, cancellationToken);
+                await ApplyAsync(order, order.Payment!, transaction, result, cancellationToken);
+                return transaction.Status != before;
+            }
+            catch (MercadoPagoGatewayException ex)
+            {
+                logger.LogWarning(ex, "Conciliación: no se pudo consultar el cobro {TransactionId}", transaction.Id);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// "Verificar con Mercado Pago" desde el panel: revisa ya los cobros sin aprobar del pedido (de los últimos 3 días),
+        /// sin esperar a la conciliación automática. Sirve cuando Mercado Pago cobró pero la respuesta no llegó.
+        /// </summary>
+        public async Task<int> ReconcileOrderAsync(Guid orderId, CancellationToken cancellationToken = default)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var candidates = await db.PaymentTransactions
+                .Where(t => t.OrderId == orderId && t.ApprovedAt == null && t.CreatedAt > now.AddDays(-3) &&
+                            (UnresolvedStatuses.Contains(t.Status) || t.Status == "error"))
+                .OrderBy(t => t.CreatedAt)
+                .ToListAsync(cancellationToken);
+
+            var changed = 0;
+            foreach (var transaction in candidates)
+                if (await ReconcileAsync(transaction, now, cancellationToken))
+                    changed++;
+            return changed;
+        }
+
         public async Task<int> ReconcilePendingAsync(CancellationToken cancellationToken = default)
         {
             var now = DateTimeOffset.UtcNow;
@@ -296,39 +370,8 @@ namespace AuraNova.Infrastructure.Payments
 
             var changed = 0;
             foreach (var transaction in candidates)
-            {
-                try
-                {
-                    var before = transaction.Status;
-                    var result = transaction.ExternalOrderId != null
-                        ? await gateway.GetOrderAsync(transaction.ExternalOrderId, cancellationToken)
-                        : await gateway.FindByExternalReferenceAsync(transaction.Id.ToString("N"), cancellationToken);
-
-                    if (result == null)
-                    {
-                        if (transaction.ExternalOrderId == null && transaction.CreatedAt < now.AddMinutes(-30))
-                        {
-                            transaction.Status = "error";
-                            transaction.StatusDetail = "Mercado Pago no registró este intento.";
-                            transaction.UpdatedAt = now;
-                            await db.SaveChangesAsync(cancellationToken);
-                        }
-                        continue;
-                    }
-
-                    var order = await db.Orders
-                        .Include(o => o.Payment!).ThenInclude(p => p.Transactions)
-                        .FirstAsync(o => o.Id == transaction.OrderId, cancellationToken);
-                    await ApplyAsync(order, order.Payment!, transaction, result, cancellationToken);
-
-                    if (transaction.Status != before)
-                        changed++;
-                }
-                catch (MercadoPagoGatewayException ex)
-                {
-                    logger.LogWarning(ex, "Conciliación: no se pudo consultar el cobro {TransactionId}", transaction.Id);
-                }
-            }
+                if (await ReconcileAsync(transaction, now, cancellationToken))
+                    changed++;
 
             if (changed > 0)
                 logger.LogInformation("Conciliación de Mercado Pago: {Changed} cobro(s) actualizados", changed);
@@ -623,6 +666,20 @@ namespace AuraNova.Infrastructure.Payments
             _ when detail.Contains("otp", StringComparison.OrdinalIgnoreCase) =>
                 "El código de Yape no es válido o ya venció. Genera uno nuevo en tu app Yape.",
             _ => "El pago fue rechazado. Prueba con otro medio de pago."
+        };
+
+        /// <summary>
+        /// Respuesta "en proceso": la página muestra "Confirmando tu pago…" y consulta el pedido hasta que se confirme.
+        /// Nunca se le dice al cliente que falló cuando Mercado Pago pudo haber cobrado.
+        /// </summary>
+        private static OnlinePaymentResult InProgress(Order order, Payment payment, decimal amount) => new()
+        {
+            Status = "pending",
+            Message = "Tu pago se está procesando. No pagues de nuevo: te avisamos apenas Mercado Pago lo confirme.",
+            AmountCharged = amount,
+            AmountPaid = payment.AmountPaid,
+            BalanceDue = Math.Max(0m, payment.Amount - payment.AmountPaid),
+            OrderStatus = order.Status.ToString()
         };
 
         private static string Money(decimal value) => $"S/ {value:F2}";

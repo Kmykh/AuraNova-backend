@@ -21,11 +21,13 @@ namespace AuraNova.UnitTests
         {
             public List<GatewayCreateOrder> Created { get; } = new();
             public Func<GatewayCreateOrder, GatewayOrder> OnCreate { get; set; } = Approved;
+            public Exception? CreateError { get; set; }
             public Dictionary<string, GatewayOrder> Orders { get; } = new();
 
             public Task<GatewayOrder> CreateOrderAsync(GatewayCreateOrder request, CancellationToken cancellationToken = default)
             {
                 Created.Add(request);
+                if (CreateError != null) throw CreateError;
                 var order = OnCreate(request);
                 if (order.Id != null) Orders[order.Id] = order;
                 return Task.FromResult(order);
@@ -109,6 +111,58 @@ namespace AuraNova.UnitTests
             IdentificationType = "DNI",
             IdentificationNumber = "12345678"
         };
+
+        [Fact]
+        public async Task LockedOrTimedOut_IsInProgress_NotRejected_AndReconciliationConfirmsIt()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 7.80m);
+            var (service, gateway, _) = Build(db);
+            gateway.CreateError = new MercadoPagoInProgressException("Mercado Pago 423: resource_already_locked");
+
+            var result = await service.PayAsync(order.Id, Card(payFull: true));
+
+            // Al cliente no se le dice que falló: queda "confirmando"
+            Assert.Equal("pending", result.Status);
+            var transaction = await db.PaymentTransactions.SingleAsync();
+            Assert.Equal("processing", transaction.Status);
+            Assert.Contains("423", transaction.StatusDetail);
+
+            // Mercado Pago sí lo cobró: "Verificar con Mercado Pago" lo encuentra por la referencia y confirma el pedido
+            var charged = gateway.Created.Single();
+            gateway.Orders["ORD-REAL"] = new GatewayOrder("ORD-REAL", "processed", "accredited", transaction.Id.ToString("N"), 7.80m,
+                [new GatewayPayment("PAY-1", "processed", "accredited", charged.PaymentMethodId, charged.PaymentMethodType)]);
+            Assert.Equal(1, await service.ReconcileOrderAsync(order.Id));
+            Assert.Equal(7.80m, (await db.Payments.SingleAsync()).AmountPaid);
+            Assert.Equal(OrderStatus.PaymentConfirmed, (await db.Orders.FindAsync(order.Id))!.Status);
+        }
+
+        [Fact]
+        public async Task SecondSubmit_WhileTheFirstIsSending_DoesNotCallMercadoPagoAgain()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 50m);
+            var payment = await db.Payments.SingleAsync();
+            db.PaymentTransactions.Add(new PaymentTransaction
+            {
+                PaymentId = payment.Id, OrderId = order.Id, MethodId = "yape", MethodType = "yape", Amount = 50m, Status = "created"
+            });
+            await db.SaveChangesAsync();
+            var (service, gateway, _) = Build(db);
+
+            var result = await service.PayAsync(order.Id, Card(payFull: true));
+
+            Assert.Equal("pending", result.Status);
+            Assert.Empty(gateway.Created);
+        }
+
+        [Fact]
+        public void IdempotencyKey_DependsOnOrderAndToken()
+        {
+            var a = MercadoPagoGateway.IdempotencyKeyFor($"{Guid.NewGuid():N}:tok");
+            var b = MercadoPagoGateway.IdempotencyKeyFor($"{Guid.NewGuid():N}:tok");
+            Assert.NotEqual(a, b);
+        }
 
         [Fact]
         public async Task Deposit_ChargesHalf_ConfirmsOrder_AndLeavesBalance()
