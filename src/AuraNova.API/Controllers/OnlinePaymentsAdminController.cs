@@ -28,6 +28,14 @@ namespace AuraNova.API.Controllers
             }
         }
 
+        /// <summary>
+        /// "Verificar con Mercado Pago": revisa ya los cobros sin aprobar del pedido (por si Mercado Pago cobró
+        /// pero la respuesta no llegó) y devuelve cuántos cambiaron.
+        /// </summary>
+        [HttpPost("orders/{orderId:guid}/payments/reconcile")]
+        public async Task<IActionResult> Reconcile(Guid orderId, CancellationToken cancellationToken) =>
+            Ok(new { changed = await onlinePayments.ReconcileOrderAsync(orderId, cancellationToken) });
+
         /// <summary>Cobros en línea del periodo (por defecto, los últimos 30 días) con totales.</summary>
         [HttpGet("payments/online")]
         public async Task<IActionResult> Report([FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to, CancellationToken cancellationToken)

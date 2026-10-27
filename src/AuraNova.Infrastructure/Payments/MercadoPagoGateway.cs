@@ -88,6 +88,13 @@ namespace AuraNova.Infrastructure.Payments
         public string? Detail { get; } = detail;
     }
 
+    /// <summary>
+    /// Mercado Pago todavía procesa el cobro o no respondió a tiempo: no se sabe si cobró.
+    /// No es un rechazo: queda "en proceso" y la conciliación lo confirma consultando a Mercado Pago.
+    /// </summary>
+    public class MercadoPagoInProgressException(string detail, Exception? inner = null)
+        : MercadoPagoGatewayException("Tu pago se está procesando.", inner, detail);
+
     public interface IMercadoPagoGateway
     {
         Task<GatewayOrder> CreateOrderAsync(GatewayCreateOrder request, CancellationToken cancellationToken = default);
@@ -198,8 +205,21 @@ namespace AuraNova.Infrastructure.Payments
                     return parsed;
 
                 var detail = ErrorDetail(ex.StatusCode ?? 0, ex.ApiResponse?.Content, ex.ApiError?.Message ?? ex.Message);
+                // 423 resource_already_locked: el mismo pago ya se envió y Mercado Pago aún lo procesa (doble envío).
+                // El primero puede aprobarse: no es un rechazo.
+                if (ex.StatusCode == 423)
+                {
+                    logger.LogWarning("Mercado Pago aún procesa un envío anterior del mismo pago: {Detail}", detail);
+                    throw new MercadoPagoInProgressException(detail, ex);
+                }
                 logger.LogWarning("Mercado Pago rechazó la creación de la order: {Detail}", detail);
                 throw new MercadoPagoGatewayException(FriendlyApiError(ex), ex, detail);
+            }
+            catch (Exception ex) when (IsTimeout(ex, cancellationToken))
+            {
+                // La petición salió pero no volvió la respuesta: Mercado Pago pudo haber cobrado (Yape tarda unos segundos)
+                logger.LogWarning(ex, "Mercado Pago no respondió a tiempo al crear la order");
+                throw new MercadoPagoInProgressException("Mercado Pago no respondió a tiempo.", ex);
             }
             catch (MercadoPagoException ex)
             {
@@ -207,6 +227,10 @@ namespace AuraNova.Infrastructure.Payments
                 throw new MercadoPagoGatewayException("No pudimos conectar con Mercado Pago. Inténtalo en unos minutos.", ex);
             }
         }
+
+        private static bool IsTimeout(Exception ex, CancellationToken cancellationToken) =>
+            !cancellationToken.IsCancellationRequested &&
+            (ex is TaskCanceledException or TimeoutException || ex.InnerException is TaskCanceledException or TimeoutException);
 
         public async Task<GatewayOrder?> GetOrderAsync(string orderId, CancellationToken cancellationToken = default)
         {
