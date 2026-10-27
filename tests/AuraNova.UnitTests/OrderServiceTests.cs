@@ -564,6 +564,33 @@ namespace AuraNova.UnitTests
         }
 
         [Fact]
+        public async Task CreateAsync_CustomColor_IsAcceptedWithNameAndTone_AndCountsTowardTheLimit()
+        {
+            using var db = GetInMemoryDb();
+            var product = await SeedProduct(db, stock: 10);
+            product.AvailableColors = ["Rosado", "Lila"];
+            product.MaxChoices = 1;
+            await db.SaveChangesAsync();
+            var zone = await SeedDeliveryZone(db);
+            var service = BuildService(db);
+            CreateOrderRequest Order(List<string> c) => new()
+            {
+                Customer = new CreateOrderCustomerRequest { Name = "María", Phone = "999999999" },
+                Items = [new() { ProductId = product.Id, Quantity = 1, SelectedColors = c }],
+                Delivery = new CreateOrderDeliveryRequest { Type = "Delivery", DeliveryZoneId = zone.Id, DeliveryAddress = "test" }
+            };
+
+            var ok = await service.CreateAsync(Order(["A pedido:  Verde menta (#98fb98)"]));
+            Assert.Equal(["A pedido: Verde menta (#98FB98)"], ok.Items[0].SelectedColors);
+
+            // Sin el tono, o con caracteres raros, no se acepta
+            await Assert.ThrowsAsync<OrderValidationException>(() => service.CreateAsync(Order(["A pedido: Verde"])));
+            await Assert.ThrowsAsync<OrderValidationException>(() => service.CreateAsync(Order(["A pedido: <b>x</b> (#FFFFFF)"])));
+            // Una sola flor: el color a pedido también cuenta como su único color
+            await Assert.ThrowsAsync<OrderValidationException>(() => service.CreateAsync(Order(["Rosado", "A pedido: Coral (#FF7F6E)"])));
+        }
+
+        [Fact]
         public async Task CreateAsync_SameProductRepeated_ShouldValidateStockWithTotalQuantity()
         {
             using var db = GetInMemoryDb();

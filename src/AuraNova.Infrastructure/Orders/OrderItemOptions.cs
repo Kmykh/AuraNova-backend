@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using AuraNova.Application.Orders.DTOs;
 using AuraNova.Domain.Entities;
 
@@ -7,7 +8,7 @@ namespace AuraNova.Infrastructure.Orders
     /// Opciones que el cliente eligió para un producto, ya validadas contra lo que el producto ofrece.
     /// Cada color o flor es un elemento de la lista: nada de texto separado por comas.
     /// </summary>
-    public sealed record OrderItemOptions(
+    public sealed partial record OrderItemOptions(
         List<string> Colors,
         List<string> FlowerTypes,
         bool HasLights,
@@ -25,6 +26,24 @@ namespace AuraNova.Infrastructure.Orders
 
         /// <summary>El cliente deja que el taller combine los colores.</summary>
         public const string MixedColors = "Surtido multicolor";
+
+        /// <summary>
+        /// Color que el cliente pide aunque no esté en la lista del producto: "A pedido: Verde menta (#98FB98)".
+        /// El taller ve el nombre y el tono exacto, y confirma con el cliente si no tiene ese material.
+        /// </summary>
+        public const string CustomColorPrefix = "A pedido: ";
+
+        [GeneratedRegex(@"^A pedido:\s*(?<name>[\p{L}\p{N} .'-]{1,30}?)\s*\((?<hex>#[0-9A-Fa-f]{6})\)$")]
+        private static partial Regex CustomColorPattern();
+
+        /// <summary>Color a pedido con el formato normalizado, o null si no lo es.</summary>
+        public static string? NormalizeCustomColor(string value)
+        {
+            var match = CustomColorPattern().Match(value.Trim());
+            if (!match.Success) return null;
+            var name = match.Groups["name"].Value.Trim();
+            return name.Length == 0 ? null : $"{CustomColorPrefix}{name} ({match.Groups["hex"].Value.ToUpperInvariant()})";
+        }
 
         public const int MaxSelections = 6;
         private const int MaxOptionLength = 50;
@@ -138,6 +157,13 @@ namespace AuraNova.Infrastructure.Orders
                 if (allowMixed && string.Equals(value, MixedColors, StringComparison.OrdinalIgnoreCase))
                 {
                     result.Add(MixedColors);
+                    continue;
+                }
+
+                // Color que no está en la lista: se acepta con nombre y tono (solo en colores, no en flores)
+                if (allowMixed && NormalizeCustomColor(value) is { } custom)
+                {
+                    result.Add(custom);
                     continue;
                 }
 
