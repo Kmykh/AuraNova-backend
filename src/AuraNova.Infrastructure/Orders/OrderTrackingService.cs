@@ -111,6 +111,64 @@ namespace AuraNova.Infrastructure.Orders
                 PhraseText = i.PhraseText
             }).ToList();
 
+        /// <summary>Notas de devolución que escribe el sistema (incluida la que le pide al equipo devolver un pago).</summary>
+        private static bool IsRefundNote(string? comment) =>
+            comment != null && (comment.StartsWith("Devolución", StringComparison.OrdinalIgnoreCase) ||
+                                comment.StartsWith("Se aprobó un pago de", StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>Un cambio del historial con un título que el cliente entiende (los pagos con su propio título).</summary>
+        private static TrackingTimelineItem TimelineItem(OrderStatusHistory h, Order order)
+        {
+            var comment = h.Comment?.Trim();
+            var item = new TrackingTimelineItem
+            {
+                Status = h.Status.ToString(),
+                Label = OrderStatusLabels.GetLabel(h.Status),
+                Description = string.IsNullOrWhiteSpace(comment) ? OrderStatusDescriptions.GetDescription(h.Status, order) : comment,
+                Completed = true,
+                CreatedAt = h.CreatedAt,
+                Kind = h.Status == Domain.Enums.OrderStatus.Cancelled ? "cancelled" : "status"
+            };
+
+            if (string.IsNullOrEmpty(comment))
+                return item;
+
+            if (comment.Contains("rechazada", StringComparison.OrdinalIgnoreCase))
+            {
+                item.Status = "PaymentRejected";
+                item.Kind = "rejection";
+                item.Label = "Pago rechazado";
+            }
+            else if (comment.StartsWith("Adelanto pagado", StringComparison.OrdinalIgnoreCase))
+            {
+                item.Kind = "payment";
+                item.Label = "Adelanto pagado";
+            }
+            else if (comment.StartsWith("Saldo pagado", StringComparison.OrdinalIgnoreCase))
+            {
+                item.Kind = "payment";
+                item.Label = "Saldo pagado: pedido pagado por completo";
+            }
+            else if (comment.StartsWith("Pago total", StringComparison.OrdinalIgnoreCase))
+            {
+                item.Kind = "payment";
+                item.Label = "Pago recibido";
+            }
+            else if (comment.StartsWith("Pago confirmado por administrador", StringComparison.OrdinalIgnoreCase))
+            {
+                item.Kind = "payment";
+                item.Label = "Pago confirmado";
+                item.Description = "Revisamos y confirmamos tu pago.";
+            }
+            else if (h.Status == Domain.Enums.OrderStatus.Cancelled)
+            {
+                var reason = comment.StartsWith("Cancelado:", StringComparison.OrdinalIgnoreCase) ? comment["Cancelado:".Length..].Trim() : comment;
+                item.Description = reason.Length > 0 ? $"Motivo: {reason}" : OrderStatusDescriptions.GetDescription(h.Status, order);
+            }
+
+            return item;
+        }
+
         private IQueryable<Order> OrdersWithDetails() => _db.Orders
             .AsNoTracking()
             .Include(o => o.Customer)
@@ -119,7 +177,7 @@ namespace AuraNova.Infrastructure.Orders
             .ThenInclude(i => i.Product)
             .Include(o => o.DeliveryZone)
             .Include(o => o.MeetingPoint)
-            .Include(o => o.Payment)
+            .Include(o => o.Payment!).ThenInclude(p => p.Transactions)
             .Include(o => o.ReferenceImages);
 
         private async Task<PublicTrackingResponse> MapAsync(Order order)
@@ -128,25 +186,25 @@ namespace AuraNova.Infrastructure.Orders
                 .OrderBy(h => h.CreatedAt)
                 .ToList();
 
-            var timeline = history.Select(h =>
+            // Las devoluciones se muestran desde los cobros (monto, medio y fecha) y no con la nota del equipo
+            var timeline = history
+                .Where(h => !IsRefundNote(h.Comment))
+                .Select(h => TimelineItem(h, order))
+                .ToList();
+
+            foreach (var t in (order.Payment?.Transactions ?? []).Where(t => t.ApprovedAt != null && t.RefundedAmount > 0))
             {
-                var isRejection = !string.IsNullOrWhiteSpace(h.Comment) &&
-                                  h.Comment.Contains("rechazada", System.StringComparison.OrdinalIgnoreCase);
-
-                var label = isRejection ? "Pago rechazado" : OrderStatusLabels.GetLabel(h.Status);
-                var description = !string.IsNullOrWhiteSpace(h.Comment)
-                    ? h.Comment
-                    : OrderStatusDescriptions.GetDescription(h.Status, order);
-
-                return new TrackingTimelineItem
+                timeline.Add(new TrackingTimelineItem
                 {
-                    Status = isRejection ? "PaymentRejected" : h.Status.ToString(),
-                    Label = label,
-                    Description = description,
+                    Status = "Refunded",
+                    Kind = "refund",
+                    Label = "Te devolvimos tu dinero",
+                    Description = $"S/ {t.RefundedAmount:F2} a tu {TrackingPayments.MethodLabel(t)}.",
                     Completed = true,
-                    CreatedAt = h.CreatedAt
-                };
-            }).ToList();
+                    CreatedAt = t.RefundedAt ?? t.UpdatedAt
+                });
+            }
+            timeline = timeline.OrderBy(i => i.CreatedAt ?? DateTimeOffset.MinValue).ToList();
 
             // Only the owner (tracking code) gets these signed, short-lived URLs
             var fileUrls = await _storage.GetReadUrlsAsync(
@@ -178,6 +236,7 @@ namespace AuraNova.Infrastructure.Orders
                 Occasion = order.Occasion,
                 BudgetRange = order.BudgetRange,
 
+                Payment = TrackingPayments.Build(order, DateTimeOffset.UtcNow),
                 Costs = new PublicTrackingCosts
                 {
                     Subtotal = order.Subtotal,
