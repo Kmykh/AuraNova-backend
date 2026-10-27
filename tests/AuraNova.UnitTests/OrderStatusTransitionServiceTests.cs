@@ -49,6 +49,8 @@ namespace AuraNova.UnitTests
         [InlineData(OrderStatus.PaymentReported)]
         [InlineData(OrderStatus.PaymentConfirmed)]
         [InlineData(OrderStatus.Preparing)]
+        [InlineData(OrderStatus.Ready)]
+        [InlineData(OrderStatus.Shipped)]
         public void IsTransitionAllowed_CancellationFromValidStates_ShouldReturnTrue(OrderStatus current)
         {
             Assert.True(_sut.IsTransitionAllowed(current, OrderStatus.Cancelled, DeliveryType.Delivery));
@@ -58,6 +60,23 @@ namespace AuraNova.UnitTests
         public void IsTransitionAllowed_CancellationFromDelivered_ShouldReturnFalse()
         {
             Assert.False(_sut.IsTransitionAllowed(OrderStatus.Delivered, OrderStatus.Cancelled, DeliveryType.Delivery));
+        }
+
+        [Fact]
+        public void IsTransitionAllowed_CancellationAtTheAgency_ShouldReturnFalse()
+        {
+            Assert.False(_sut.IsTransitionAllowed(OrderStatus.DeliveredToAgency, OrderStatus.Cancelled, DeliveryType.NationalShipping));
+        }
+
+        [Theory]
+        [InlineData("{\"status\":8}", "8")]
+        [InlineData("{\"status\":\"Delivered\"}", "Delivered")]
+        public void ChangeStatusRequest_AcceptsTheStatusAsNumberOrName(string json, string expected)
+        {
+            var request = System.Text.Json.JsonSerializer.Deserialize<AuraNova.Application.Orders.DTOs.ChangeOrderStatusRequest>(
+                json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            Assert.Equal(expected, request!.Status);
+            Assert.True(Enum.TryParse<OrderStatus>(request.Status, true, out var status) && status == OrderStatus.Delivered);
         }
 
         [Fact]
