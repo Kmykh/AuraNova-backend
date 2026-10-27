@@ -31,6 +31,7 @@ namespace AuraNova.Application.Orders.DTOs
         public string? SelectedFlowerColor { get; set; }
         public bool HasLights { get; set; }
         public bool HasButterfly { get; set; }
+        public List<OrderItemAccessoryDto> Accessories { get; set; } = new();
         public bool HasPhraseCard { get; set; }
         public string? PhraseText { get; set; }
         public string? PhraseFont { get; set; }

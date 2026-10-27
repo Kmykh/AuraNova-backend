@@ -19,8 +19,15 @@ namespace AuraNova.Infrastructure.Orders
         string? PhraseTo = null,
         string? PhraseFrom = null,
         string? PhraseTheme = null,
-        string? CardBackgroundPath = null)
+        string? CardBackgroundPath = null,
+        List<OrderItemAccessory>? Accessories = null)
     {
+        /// <summary>Accesorios elegidos con el precio vigente del negocio.</summary>
+        public List<OrderItemAccessory> AccessoryList => Accessories ?? [];
+
+        /// <summary>Lo que suman los accesorios a cada unidad.</summary>
+        public decimal AccessoriesPrice => AccessoryList.Sum(a => a.Price);
+
         /// <summary>Diseños de tarjeta que ofrece la web ("foto" = fondo subido por el cliente).</summary>
         public static readonly string[] CardThemes = ["marfil", "rosa", "pergamino", "noir", "salvia", "foto"];
 
@@ -52,7 +59,7 @@ namespace AuraNova.Infrastructure.Orders
         // Valores que enviaba la versión anterior de la web para el surtido
         private static readonly string[] LegacyMixedLabels = ["Surtido (Varios colores)", "Surtido", "Varios colores"];
 
-        public static OrderItemOptions Resolve(CreateOrderItemRequest item, Product product)
+        public static OrderItemOptions Resolve(CreateOrderItemRequest item, Product product, List<AccessoryOption>? catalog = null)
         {
             var colors = Pick(
                 item.SelectedColors,
@@ -100,18 +107,52 @@ namespace AuraNova.Infrastructure.Orders
             if (theme == "foto" && background == null)
                 theme = null;
 
+            var accessories = ResolveAccessories(item, product, AccessoryCatalog.Effective(catalog));
+
             return new OrderItemOptions(
                 resolvedColors,
                 resolvedFlowers,
-                item.HasLights && product.AllowsLights,
-                item.HasButterfly && product.AllowsButterfly,
+                accessories.Any(a => a.Key == AccessoryCatalog.Lights),
+                accessories.Any(a => a.Key == AccessoryCatalog.Butterfly),
                 hasPhraseCard,
                 string.IsNullOrEmpty(phrase) ? null : phrase,
                 string.IsNullOrEmpty(font) ? null : font,
                 hasPhraseCard ? Clean(item.PhraseTo, 60) : null,
                 hasPhraseCard ? Clean(item.PhraseFrom, 60) : null,
                 theme,
-                background);
+                background,
+                accessories);
+        }
+
+        /// <summary>
+        /// Accesorios que ofrece el producto, con el nombre y precio de la configuración del negocio (nunca el que manda la web).
+        /// La web anterior solo enviaba luces/mariposas como sí/no: lo que ya no se ofrece se ignora, como antes.
+        /// </summary>
+        private static List<OrderItemAccessory> ResolveAccessories(CreateOrderItemRequest item, Product product, List<AccessoryOption> catalog)
+        {
+            var legacy = item.SelectedAccessories == null;
+            var requested = legacy
+                ? new[] { item.HasLights ? AccessoryCatalog.Lights : null, item.HasButterfly ? AccessoryCatalog.Butterfly : null }
+                    .OfType<string>().ToList()
+                : item.SelectedAccessories!.Select(AccessoryCatalog.Slug).Where(k => k.Length > 0).Distinct().ToList();
+
+            if (requested.Count > AccessoryCatalog.MaxAccessories)
+                throw new OrderValidationException($"Puedes elegir hasta {AccessoryCatalog.MaxAccessories} accesorios por producto.");
+
+            var offered = AccessoryCatalog.ProductKeys(product);
+            var result = new List<OrderItemAccessory>(requested.Count);
+            foreach (var key in requested)
+            {
+                var option = catalog.FirstOrDefault(a => a.Key == key);
+                if (option is not { Active: true } || !offered.Contains(key))
+                {
+                    if (legacy) continue;
+                    throw new OrderValidationException(
+                        $"El accesorio '{option?.Name ?? key}' ya no está disponible para '{product.Name}'. Actualiza tu carrito e inténtalo de nuevo.");
+                }
+                result.Add(new OrderItemAccessory { Key = option.Key, Name = option.Name, Price = option.Price });
+            }
+            return result;
         }
 
         private static string? Clean(string? value, int max)
@@ -123,8 +164,8 @@ namespace AuraNova.Infrastructure.Orders
 
         /// <summary>Clave para reconocer el mismo producto con la misma personalización.</summary>
         public string Key => string.Join("|",
-            string.Join(",", Colors), string.Join(",", FlowerTypes), HasLights, HasButterfly, HasPhraseCard, PhraseText, PhraseFont,
-            PhraseTo, PhraseFrom, PhraseTheme, CardBackgroundPath);
+            string.Join(",", Colors), string.Join(",", FlowerTypes), string.Join(",", AccessoryList.Select(a => a.Key).Order()),
+            HasPhraseCard, PhraseText, PhraseFont, PhraseTo, PhraseFrom, PhraseTheme, CardBackgroundPath);
 
         /// <summary>Lista nueva si viene; si no, los campos de texto anteriores (que podían traer comas).</summary>
         private static List<string> Pick(List<string>? list, string?[] legacy)

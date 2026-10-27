@@ -77,8 +77,11 @@ namespace AuraNova.Infrastructure.Orders
 
             // --- 6b. Opciones elegidas, validadas contra lo que ofrece cada producto.
             //         Las líneas con la misma personalización se juntan en una sola ---
+            var accessoryCatalog = await _db.BusinessSettings.AsNoTracking()
+                .Select(s => s.AccessoryOptions)
+                .FirstOrDefaultAsync();
             var lines = request.Items
-                .Select(item => (Item: item, Options: OrderItemOptions.Resolve(item, products.First(p => p.Id == item.ProductId))))
+                .Select(item => (Item: item, Options: OrderItemOptions.Resolve(item, products.First(p => p.Id == item.ProductId), accessoryCatalog)))
                 .GroupBy(l => (l.Item.ProductId, l.Options.Key))
                 .Select(g => (ProductId: g.Key.ProductId, Quantity: g.Sum(l => l.Item.Quantity), Options: g.First().Options))
                 .ToList();
@@ -202,16 +205,18 @@ namespace AuraNova.Infrastructure.Orders
                     var product = products.First(p => p.Id == line.ProductId);
                     var options = line.Options;
 
-                    // Resolve campaign price
+                    // Resolve campaign price; los accesorios se cobran aparte (la campaña no los descuenta)
                     var priceResult = await _priceResolver.ResolvePriceAsync(product.Id);
-                    var itemSubtotal = priceResult.EffectivePrice * line.Quantity;
+                    var unitPrice = priceResult.EffectivePrice + options.AccessoriesPrice;
+                    var itemSubtotal = unitPrice * line.Quantity;
 
                     var orderItem = new OrderItem
                     {
                         ProductId = product.Id,
                         Quantity = line.Quantity,
-                        UnitPrice = priceResult.EffectivePrice, // Historical price snapshot (from campaign or base)
+                        UnitPrice = unitPrice, // Historical price snapshot (from campaign or base) + accesorios
                         Subtotal = itemSubtotal,
+                        Accessories = options.AccessoryList,
                         SelectedColors = options.Colors,
                         SelectedFlowerTypes = options.FlowerTypes,
                         // Campos anteriores: solo la primera opción, sin listas en texto
@@ -335,6 +340,7 @@ namespace AuraNova.Infrastructure.Orders
                                 SelectedFlowerColor = oi.SelectedFlowerColor,
                                 HasLights = oi.HasLights,
                                 HasButterfly = oi.HasButterfly,
+                                Accessories = AccessoryCatalog.ForItem(oi),
                                 HasPhraseCard = oi.HasPhraseCard,
                                 PhraseText = oi.PhraseText,
                                 PhraseFont = oi.PhraseFont

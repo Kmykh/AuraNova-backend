@@ -26,6 +26,9 @@ namespace AuraNova.Domain.Entities
         public bool AllowsButterfly { get; set; } = false;
         public bool AllowsPhraseCard { get; set; } = false;
 
+        /// <summary>Claves de los accesorios que se ofrecen con este producto (de la lista del negocio).</summary>
+        public List<string> AvailableAccessories { get; set; } = new List<string>();
+
         /// <summary>
         /// Cuántos colores y tipos de flor puede elegir el cliente. 1 = flor por unidad (un solo color);
         /// null = sin límite propio (hasta el máximo general).

@@ -49,13 +49,13 @@ namespace AuraNova.Infrastructure.Products
                 IsAvailable = true,
                 AvailableColors = CleanOptions(request.AvailableColors, "color"),
                 AvailableFlowerTypes = CleanOptions(request.AvailableFlowerTypes, "tipo de flor"),
-                AllowsLights = request.AllowsLights,
-                AllowsButterfly = request.AllowsButterfly,
                 AllowsPhraseCard = request.AllowsPhraseCard,
                 MaxChoices = request.MaxChoices,
                 CategoryId = request.CategoryId,
                 Audience = request.Audience
             };
+
+            SetAccessories(product, request.AvailableAccessories, request.AllowsLights, request.AllowsButterfly);
 
             product.Images = images
                 .Select((path, index) => new ProductImage { ProductId = product.Id, Path = path, SortOrder = index })
@@ -113,9 +113,8 @@ namespace AuraNova.Infrastructure.Products
             product.ImageUrl = images.FirstOrDefault();
             product.AvailableColors = CleanOptions(request.AvailableColors, "color");
             product.AvailableFlowerTypes = CleanOptions(request.AvailableFlowerTypes, "tipo de flor");
-            product.AllowsLights = request.AllowsLights;
-            product.AllowsButterfly = request.AllowsButterfly;
             product.AllowsPhraseCard = request.AllowsPhraseCard;
+            SetAccessories(product, request.AvailableAccessories, request.AllowsLights, request.AllowsButterfly);
             product.MaxChoices = request.MaxChoices;
             product.CategoryId = request.CategoryId;
             product.Audience = request.Audience;
@@ -325,6 +324,7 @@ namespace AuraNova.Infrastructure.Products
                 AllowsLights = product.AllowsLights,
                 AllowsButterfly = product.AllowsButterfly,
                 AllowsPhraseCard = product.AllowsPhraseCard,
+                AvailableAccessories = AuraNova.Infrastructure.Orders.AccessoryCatalog.ProductKeys(product),
                 MaxChoices = product.MaxChoices,
                 Audience = product.Audience,
                 Category = product.Category != null
@@ -347,6 +347,26 @@ namespace AuraNova.Infrastructure.Products
                 CampaignStageName = priceResult?.CampaignStageName,
                 CampaignStageEndsAt = priceResult?.CampaignStageEndDate
             };
+        }
+
+        /// <summary>
+        /// Accesorios del producto (claves). Si el panel anterior solo envía luces/mariposas como sí/no, se convierten.
+        /// AllowsLights/AllowsButterfly se mantienen al día para lo que todavía los lee.
+        /// </summary>
+        private static void SetAccessories(Product product, List<string>? keys, bool allowsLights, bool allowsButterfly)
+        {
+            var clean = keys == null
+                // Se conservan los demás accesorios: solo cambian luces y mariposas
+                ? product.AvailableAccessories.Where(k => k != AuraNova.Infrastructure.Orders.AccessoryCatalog.Lights && k != AuraNova.Infrastructure.Orders.AccessoryCatalog.Butterfly).ToList()
+                : keys.Select(AuraNova.Infrastructure.Orders.AccessoryCatalog.Slug).Where(k => k.Length > 0).Distinct().Take(AuraNova.Infrastructure.Orders.AccessoryCatalog.MaxAccessories).ToList();
+            if (keys == null)
+            {
+                if (allowsLights) clean.Add(AuraNova.Infrastructure.Orders.AccessoryCatalog.Lights);
+                if (allowsButterfly) clean.Add(AuraNova.Infrastructure.Orders.AccessoryCatalog.Butterfly);
+            }
+            product.AvailableAccessories = clean;
+            product.AllowsLights = clean.Contains(AuraNova.Infrastructure.Orders.AccessoryCatalog.Lights);
+            product.AllowsButterfly = clean.Contains(AuraNova.Infrastructure.Orders.AccessoryCatalog.Butterfly);
         }
     }
 }

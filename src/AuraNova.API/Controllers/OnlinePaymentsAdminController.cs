@@ -48,8 +48,9 @@ namespace AuraNova.API.Controllers
             return Ok(await onlinePayments.GetReportAsync(start, end, cancellationToken));
         }
 
-        /// <summary>Últimos avisos (webhooks) recibidos de Mercado Pago y su resultado.</summary>
+        /// <summary>Últimos avisos (webhooks) recibidos de Mercado Pago y su resultado (solo el desarrollador).</summary>
         [HttpGet("payments/webhooks")]
+        [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> Webhooks([FromQuery] int take = 20, CancellationToken cancellationToken = default) =>
             Ok(await onlinePayments.GetWebhookEventsAsync(take, cancellationToken));
     }

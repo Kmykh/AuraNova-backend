@@ -535,6 +535,102 @@ namespace AuraNova.UnitTests
             Assert.Equal(5, (await db.Products.FindAsync(product.Id))!.Stock);
         }
 
+        // =====================================================================
+        // ACCESORIOS CON PRECIO
+        // =====================================================================
+
+        private async Task<(Product Product, DeliveryZone Zone)> SeedAccessories(AppDbContext db)
+        {
+            db.BusinessSettings.Add(new BusinessSettings
+            {
+                AccessoryOptions =
+                [
+                    new() { Key = "luces", Name = "Luces LED", Price = 1m },
+                    new() { Key = "perlas", Name = "Perlas", Price = 3.50m },
+                    new() { Key = "lazo", Name = "Lazo de seda", Price = 2m, Active = false }
+                ]
+            });
+            var product = await SeedProduct(db, price: 79.90m, stock: 10);
+            product.AvailableAccessories = ["luces", "perlas", "lazo"];
+            await db.SaveChangesAsync();
+            return (product, await SeedDeliveryZone(db, cost: 7m));
+        }
+
+        private static CreateOrderRequest AccessoryOrder(Guid productId, Guid zoneId, params List<string>[] accessoriesPerLine) => new()
+        {
+            Customer = new CreateOrderCustomerRequest { Name = "María", Phone = "999999999" },
+            Items = [.. accessoriesPerLine.Select(a => new CreateOrderItemRequest { ProductId = productId, Quantity = 2, SelectedAccessories = a })],
+            Delivery = new CreateOrderDeliveryRequest { Type = "Delivery", DeliveryZoneId = zoneId, DeliveryAddress = "test" }
+        };
+
+        [Fact]
+        public async Task CreateAsync_Accessories_AreChargedWithTheBusinessPrice()
+        {
+            using var db = GetInMemoryDb();
+            var (product, zone) = await SeedAccessories(db);
+
+            var result = await BuildService(db).CreateAsync(AccessoryOrder(product.Id, zone.Id, ["luces", "Perlas"]));
+
+            var item = Assert.Single(result.Items);
+            Assert.Equal(84.40m, item.UnitPrice); // 79.90 + 1 + 3.50
+            Assert.Equal(168.80m, item.Subtotal);
+            Assert.Equal(175.80m, result.Total);
+            Assert.True(item.HasLights);
+            Assert.Equal(["Luces LED", "Perlas"], item.Accessories.Select(a => a.Name));
+
+            var saved = await db.OrderItems.SingleAsync();
+            Assert.Equal([1m, 3.50m], saved.Accessories.Select(a => a.Price));
+        }
+
+        [Theory]
+        [InlineData("lazo")]     // desactivado por el negocio
+        [InlineData("mariposas")] // el producto no lo ofrece
+        public async Task CreateAsync_Accessories_RejectsTheOnesNoLongerOffered(string key)
+        {
+            using var db = GetInMemoryDb();
+            var (product, zone) = await SeedAccessories(db);
+
+            var ex = await Assert.ThrowsAsync<OrderValidationException>(() =>
+                BuildService(db).CreateAsync(AccessoryOrder(product.Id, zone.Id, [key])));
+            Assert.Contains("ya no está disponible", ex.Message);
+        }
+
+        [Fact]
+        public async Task CreateAsync_Accessories_DifferentAccessoriesAreSeparateLines()
+        {
+            using var db = GetInMemoryDb();
+            var (product, zone) = await SeedAccessories(db);
+
+            var result = await BuildService(db).CreateAsync(AccessoryOrder(product.Id, zone.Id, ["perlas"], [], ["perlas"]));
+
+            Assert.Equal(2, result.Items.Count);
+            Assert.Equal(83.40m, result.Items[0].UnitPrice);
+            Assert.Equal(4, result.Items[0].Quantity);
+            Assert.Equal(79.90m, result.Items[1].UnitPrice);
+        }
+
+        [Fact]
+        public async Task CreateAsync_Accessories_PreviousWebFlagsStillWorkWithoutCost()
+        {
+            using var db = GetInMemoryDb();
+            var product = await SeedProduct(db, price: 50m, stock: 10);
+            product.AllowsLights = true; // producto anterior, sin lista de accesorios
+            await db.SaveChangesAsync();
+            var zone = await SeedDeliveryZone(db);
+            var request = AccessoryOrder(product.Id, zone.Id, new List<string>());
+            request.Items[0].SelectedAccessories = null;
+            request.Items[0].HasLights = true;
+            request.Items[0].HasButterfly = true; // no lo ofrece: se ignora, como antes
+
+            var result = await BuildService(db).CreateAsync(request);
+
+            var item = Assert.Single(result.Items);
+            Assert.Equal(50m, item.UnitPrice);
+            Assert.True(item.HasLights);
+            Assert.False(item.HasButterfly);
+            Assert.Equal(["luces"], item.Accessories.Select(a => a.Key));
+        }
+
         [Theory]
         [InlineData(new[] { "Rosado", "Lila" }, new[] { "Rosas" })]
         [InlineData(new[] { "Surtido multicolor" }, new[] { "Rosas" })]

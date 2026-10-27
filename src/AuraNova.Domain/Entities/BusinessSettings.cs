@@ -17,6 +17,8 @@ namespace AuraNova.Domain.Entities
         // Opciones de personalización que el panel ofrece al crear productos
         public List<ColorOption> ColorPalette { get; set; } = new List<ColorOption>();
         public List<string> FlowerTypeOptions { get; set; } = new List<string>();
+        /// <summary>Accesorios con precio extra (vacío = los iniciales: luces y mariposas sin costo).</summary>
+        public List<AccessoryOption> AccessoryOptions { get; set; } = new List<AccessoryOption>();
         
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset? UpdatedAt { get; set; }

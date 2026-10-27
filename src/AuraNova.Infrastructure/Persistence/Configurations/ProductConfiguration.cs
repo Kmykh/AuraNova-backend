@@ -48,6 +48,17 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
                 .Metadata.SetValueComparer(stringListComparer);
             builder.Property(p => p.AvailableColors).HasDefaultValueSql("'[]'");
 
+            builder.Property(p => p.AvailableAccessories)
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new System.Collections.Generic.List<string>())
+                .Metadata.SetValueComparer(new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<System.Collections.Generic.List<string>>(
+                (a, b) => System.Text.Json.JsonSerializer.Serialize(a, (System.Text.Json.JsonSerializerOptions?)null) ==
+                          System.Text.Json.JsonSerializer.Serialize(b, (System.Text.Json.JsonSerializerOptions?)null),
+                c => System.Text.Json.JsonSerializer.Serialize(c, (System.Text.Json.JsonSerializerOptions?)null).GetHashCode(),
+                c => c.ToList()));
+            builder.Property(p => p.AvailableAccessories).HasDefaultValueSql("'[]'");
+
             builder.Property(p => p.AvailableFlowerTypes)
                 .HasConversion(
                     v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),

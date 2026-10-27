@@ -106,6 +106,7 @@ namespace AuraNova.Infrastructure.Orders
                 SelectedFlowerTypes = i.SelectedFlowerTypes ?? [],
                 HasLights = i.HasLights,
                 HasButterfly = i.HasButterfly,
+                Accessories = AccessoryCatalog.ForItem(i),
                 HasPhraseCard = i.HasPhraseCard,
                 PhraseText = i.PhraseText
             }).ToList();

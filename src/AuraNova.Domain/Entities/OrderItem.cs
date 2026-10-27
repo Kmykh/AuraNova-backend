@@ -28,6 +28,8 @@ namespace AuraNova.Domain.Entities
         public bool HasLights { get; set; } = false;
         public bool HasButterfly { get; set; } = false;
         public bool HasPhraseCard { get; set; } = false;
+        /// <summary>Accesorios elegidos con su precio de ese momento (ya sumados en UnitPrice).</summary>
+        public List<OrderItemAccessory> Accessories { get; set; } = new List<OrderItemAccessory>();
         public string? PhraseText { get; set; }
         public string? PhraseFont { get; set; }
         /// <summary>Tarjeta: para quién es (se imprime "Para: …").</summary>

@@ -16,7 +16,7 @@ namespace AuraNova.API.Controllers
     /// </summary>
     [ApiController]
     [Route("api/admin/diagnostics")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "SuperAdmin")] // Herramientas del desarrollador, no del equipo que atiende pedidos
     [EnableRateLimiting("admin_policy")]
     public class DiagnosticsAdminController(
         IOptions<SecuritySettings> securityOptions,

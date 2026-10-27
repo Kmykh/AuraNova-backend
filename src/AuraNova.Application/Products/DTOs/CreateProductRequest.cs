@@ -27,6 +27,9 @@ namespace AuraNova.Application.Products.DTOs
         public bool AllowsButterfly { get; set; } = false;
         public bool AllowsPhraseCard { get; set; } = false;
 
+        /// <summary>Claves de los accesorios que ofrece el producto. Null = se toman de AllowsLights/AllowsButterfly.</summary>
+        public List<string>? AvailableAccessories { get; set; }
+
         /// <summary>Cuántos colores y tipos de flor puede elegir el cliente (1 = flor por unidad). Vacío = sin límite propio.</summary>
         [System.ComponentModel.DataAnnotations.Range(1, 5)]
         public int? MaxChoices { get; set; }

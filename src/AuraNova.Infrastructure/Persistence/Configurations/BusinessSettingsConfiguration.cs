@@ -49,6 +49,17 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
                     v => System.Text.Json.JsonSerializer.Deserialize<List<string>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new List<string>())
                 .Metadata.SetValueComparer(stringListComparer);
             builder.Property(x => x.FlowerTypeOptions).HasDefaultValueSql("'[]'");
+
+            builder.Property(x => x.AccessoryOptions)
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<AuraNova.Domain.Entities.AccessoryOption>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new System.Collections.Generic.List<AuraNova.Domain.Entities.AccessoryOption>())
+                .Metadata.SetValueComparer(new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<System.Collections.Generic.List<AuraNova.Domain.Entities.AccessoryOption>>(
+                (a, b) => System.Text.Json.JsonSerializer.Serialize(a, (System.Text.Json.JsonSerializerOptions?)null) ==
+                          System.Text.Json.JsonSerializer.Serialize(b, (System.Text.Json.JsonSerializerOptions?)null),
+                c => System.Text.Json.JsonSerializer.Serialize(c, (System.Text.Json.JsonSerializerOptions?)null).GetHashCode(),
+                c => c.Select(o => new AuraNova.Domain.Entities.AccessoryOption { Key = o.Key, Name = o.Name, Price = o.Price, Active = o.Active }).ToList()));
+            builder.Property(x => x.AccessoryOptions).HasDefaultValueSql("'[]'");
         }
     }
 }
