@@ -22,12 +22,18 @@ namespace AuraNova.UnitTests
             public List<GatewayCreateOrder> Created { get; } = new();
             public Func<GatewayCreateOrder, GatewayOrder> OnCreate { get; set; } = Approved;
             public Exception? CreateError { get; set; }
+            /// <summary>Mercado Pago creó (y cobró) la order aunque respondió con error.</summary>
+            public bool ChargedDespiteError { get; set; }
             public Dictionary<string, GatewayOrder> Orders { get; } = new();
 
             public Task<GatewayOrder> CreateOrderAsync(GatewayCreateOrder request, CancellationToken cancellationToken = default)
             {
                 Created.Add(request);
-                if (CreateError != null) throw CreateError;
+                if (CreateError != null)
+                {
+                    if (ChargedDespiteError) Orders[$"ORD-{request.IdempotencyKey}"] = Approved(request);
+                    throw CreateError;
+                }
                 var order = OnCreate(request);
                 if (order.Id != null) Orders[order.Id] = order;
                 return Task.FromResult(order);
@@ -96,7 +102,7 @@ namespace AuraNova.UnitTests
         {
             var gateway = new FakeGateway();
             var notifications = new Mock<INotificationService>();
-            return (new OnlinePaymentService(db, gateway, notifications.Object, new NullLogger<OnlinePaymentService>()), gateway, notifications);
+            return (new OnlinePaymentService(db, gateway, notifications.Object, new NullLogger<OnlinePaymentService>(), verifyDelay: TimeSpan.Zero), gateway, notifications);
         }
 
         private static CreateOnlinePaymentRequest Card(bool payFull, string token = "tok-1") => new()
@@ -134,6 +140,23 @@ namespace AuraNova.UnitTests
                 [new GatewayPayment("PAY-1", "processed", "accredited", charged.PaymentMethodId, charged.PaymentMethodType)]);
             Assert.Equal(1, await service.ReconcileOrderAsync(order.Id));
             Assert.Equal(7.80m, (await db.Payments.SingleAsync()).AmountPaid);
+            Assert.Equal(OrderStatus.PaymentConfirmed, (await db.Orders.FindAsync(order.Id))!.Status);
+        }
+
+        [Fact]
+        public async Task Locked_ButCharged_IsConfirmedRightAway()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 7.80m);
+            var (service, gateway, _) = Build(db);
+            gateway.CreateError = new MercadoPagoInProgressException("Mercado Pago 423: resource_already_locked");
+            gateway.ChargedDespiteError = true;
+
+            var result = await service.PayAsync(order.Id, Card(payFull: true));
+
+            // Igual que el AN-1009 real: respondió 423 pero cobró; se confirma sin esperar a la conciliación
+            Assert.Equal("approved", result.Status);
+            Assert.Equal(7.80m, result.AmountPaid);
             Assert.Equal(OrderStatus.PaymentConfirmed, (await db.Orders.FindAsync(order.Id))!.Status);
         }
 

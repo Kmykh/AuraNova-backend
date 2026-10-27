@@ -23,7 +23,8 @@ namespace AuraNova.Infrastructure.Payments
         INotificationService notificationService,
         ILogger<OnlinePaymentService> logger,
         IStorageUrlResolver? storageUrls = null,
-        ICurrentUserService? currentUser = null) : IOnlinePaymentService
+        ICurrentUserService? currentUser = null,
+        TimeSpan? verifyDelay = null) : IOnlinePaymentService
     {
         // Un cobro "en proceso" bloquea otro intento durante este tiempo (evita pagar dos veces)
         private static readonly TimeSpan PendingLock = TimeSpan.FromMinutes(15);
@@ -146,12 +147,20 @@ namespace AuraNova.Infrastructure.Payments
             }
             catch (MercadoPagoInProgressException ex)
             {
-                // No se sabe si cobró: queda en proceso y la conciliación lo confirma (o lo descarta) con Mercado Pago
-                transaction.Status = "processing";
-                transaction.StatusDetail = Truncate(ex.Detail ?? ex.Message, 100);
-                transaction.UpdatedAt = DateTimeOffset.UtcNow;
-                await db.SaveChangesAsync(cancellationToken);
-                return InProgress(order, payment, amount);
+                // Mercado Pago suele terminar en segundos aunque haya respondido 423 o no a tiempo:
+                // se le pregunta de inmediato por la referencia de este intento antes de responder "en proceso"
+                var found = await FindSoonAsync(transaction, cancellationToken);
+                if (found == null)
+                {
+                    // Sigue sin saberse: queda en proceso y la conciliación lo confirma (o lo descarta)
+                    transaction.Status = "processing";
+                    transaction.StatusDetail = Truncate(ex.Detail ?? ex.Message, 100);
+                    transaction.UpdatedAt = DateTimeOffset.UtcNow;
+                    await db.SaveChangesAsync(cancellationToken);
+                    return InProgress(order, payment, amount);
+                }
+                logger.LogInformation("Cobro {TransactionId} confirmado al consultar a Mercado Pago tras {Detail}", transaction.Id, ex.Detail);
+                result = found;
             }
             catch (MercadoPagoGatewayException ex)
             {
@@ -667,6 +676,26 @@ namespace AuraNova.Infrastructure.Payments
                 "El código de Yape no es válido o ya venció. Genera uno nuevo en tu app Yape.",
             _ => "El pago fue rechazado. Prueba con otro medio de pago."
         };
+
+        /// <summary>Consulta hasta 3 veces (a los 2, 3 y 4 s) si Mercado Pago creó la order de este intento.</summary>
+        private async Task<GatewayOrder?> FindSoonAsync(PaymentTransaction transaction, CancellationToken cancellationToken)
+        {
+            var step = verifyDelay ?? TimeSpan.FromSeconds(1);
+            for (var attempt = 1; attempt <= 3; attempt++)
+            {
+                await Task.Delay(step * (attempt + 1), cancellationToken);
+                try
+                {
+                    if (await gateway.FindByExternalReferenceAsync(transaction.Id.ToString("N"), cancellationToken) is { Id: not null } order)
+                        return order;
+                }
+                catch (MercadoPagoGatewayException ex)
+                {
+                    logger.LogWarning(ex, "No se pudo consultar el cobro {TransactionId} tras la respuesta en proceso", transaction.Id);
+                }
+            }
+            return null;
+        }
 
         /// <summary>
         /// Respuesta "en proceso": la página muestra "Confirmando tu pago…" y consulta el pedido hasta que se confirme.
