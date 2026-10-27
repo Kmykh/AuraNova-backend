@@ -47,6 +47,17 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
                 .Metadata.SetValueComparer(stringListComparer);
             builder.Property(oi => oi.SelectedColors).HasDefaultValueSql("'[]'");
 
+            builder.Property(oi => oi.Accessories)
+                .HasConversion(
+                    v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),
+                    v => System.Text.Json.JsonSerializer.Deserialize<System.Collections.Generic.List<AuraNova.Domain.Entities.OrderItemAccessory>>(v, (System.Text.Json.JsonSerializerOptions?)null) ?? new System.Collections.Generic.List<AuraNova.Domain.Entities.OrderItemAccessory>())
+                .Metadata.SetValueComparer(new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<System.Collections.Generic.List<AuraNova.Domain.Entities.OrderItemAccessory>>(
+                (a, b) => System.Text.Json.JsonSerializer.Serialize(a, (System.Text.Json.JsonSerializerOptions?)null) ==
+                          System.Text.Json.JsonSerializer.Serialize(b, (System.Text.Json.JsonSerializerOptions?)null),
+                c => System.Text.Json.JsonSerializer.Serialize(c, (System.Text.Json.JsonSerializerOptions?)null).GetHashCode(),
+                c => c.Select(o => new AuraNova.Domain.Entities.OrderItemAccessory { Key = o.Key, Name = o.Name, Price = o.Price }).ToList()));
+            builder.Property(oi => oi.Accessories).HasDefaultValueSql("'[]'");
+
             builder.Property(oi => oi.SelectedFlowerTypes)
                 .HasConversion(
                     v => System.Text.Json.JsonSerializer.Serialize(v, (System.Text.Json.JsonSerializerOptions?)null),

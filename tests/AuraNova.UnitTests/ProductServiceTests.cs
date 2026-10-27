@@ -196,6 +196,25 @@ namespace AuraNova.UnitTests
         }
 
         [Fact]
+        public async Task UpdateAsync_Accessories_PreviousPanelOnlyTogglesLightsAndButterfly()
+        {
+            using var db = GetInMemoryDb();
+            var priceResolver = new Moq.Mock<AuraNova.Application.Orders.Interfaces.IProductPriceResolver>();
+            var service = new ProductService(db, GetMockLogger(), priceResolver.Object, new Moq.Mock<AuraNova.Application.Storage.Interfaces.IFileStorageService>().Object);
+
+            var product = await service.CreateAsync(new CreateProductRequest { Name = "Ramo", Price = 10, Stock = 5, AvailableAccessories = ["Perlas", "luces"] });
+            Assert.Equal(["perlas", "luces"], product.AvailableAccessories);
+            Assert.True(product.AllowsLights);
+
+            // Sin la lista (panel anterior): las perlas se quedan, solo cambian luces y mariposas
+            var updated = await service.UpdateAsync(product.Id, new UpdateProductRequest { Name = "Ramo", Price = 10, AllowsButterfly = true });
+
+            Assert.Equal(["perlas", "mariposas"], updated!.AvailableAccessories);
+            Assert.False(updated.AllowsLights);
+            Assert.True(updated.AllowsButterfly);
+        }
+
+        [Fact]
         public async Task UpdateAsync_ReplacingSharedImage_KeepsFile()
         {
             using var db = GetInMemoryDb();

@@ -122,6 +122,12 @@ namespace AuraNova.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AccessoryOptions")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValueSql("'[]'");
+
                     b.Property<string>("BusinessName")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -685,6 +691,12 @@ namespace AuraNova.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Accessories")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValueSql("'[]'");
+
                     b.Property<string>("AppliedCampaignName")
                         .HasColumnType("text");
 
@@ -1034,6 +1046,12 @@ namespace AuraNova.Infrastructure.Migrations
                     b.Property<string>("Audience")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
+
+                    b.Property<string>("AvailableAccessories")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValueSql("'[]'");
 
                     b.Property<string>("AvailableColors")
                         .IsRequired()

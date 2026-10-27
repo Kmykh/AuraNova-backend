@@ -136,8 +136,8 @@ namespace AuraNova.Infrastructure.Payments
             var parts = new List<string>();
             if (item.SelectedColors is { Count: > 0 }) parts.Add($"Colores: {string.Join(", ", item.SelectedColors)}");
             if (item.SelectedFlowerTypes is { Count: > 0 }) parts.Add($"Flores: {string.Join(", ", item.SelectedFlowerTypes)}");
-            if (item.HasLights) parts.Add("con luces");
-            if (item.HasButterfly) parts.Add("con mariposa");
+            var accessories = Orders.AccessoryCatalog.ForItem(item);
+            if (accessories.Count > 0) parts.Add($"Con {string.Join(", ", accessories.Select(a => a.Name.ToLowerInvariant()))}");
             if (item.HasPhraseCard) parts.Add("con tarjeta de frase");
             return parts.Count > 0 ? string.Join(" · ", parts) : null;
         }

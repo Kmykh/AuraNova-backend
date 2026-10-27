@@ -107,7 +107,8 @@ namespace AuraNova.Infrastructure.Orders
                             ProductName = i.Product != null ? i.Product.Name : string.Empty,
                             ImageUrl = i.Product != null ? i.Product.ImageUrl : null,
                             i.SelectedColors,
-                            HasExtras = i.HasLights || i.HasButterfly || i.HasPhraseCard
+                            HasExtras = i.HasLights || i.HasButterfly || i.HasPhraseCard,
+                            i.Accessories
                         })
                         .ToList()
                 })
@@ -149,7 +150,7 @@ namespace AuraNova.Infrastructure.Orders
                         Quantity = i.Quantity,
                         ImageUrl = i.ImageUrl,
                         Colors = (i.SelectedColors ?? []).Take(4).ToList(),
-                        HasExtras = i.HasExtras
+                        HasExtras = i.HasExtras || i.Accessories is { Count: > 0 }
                     }).ToList()
                 }).ToList();
 
@@ -271,6 +272,7 @@ namespace AuraNova.Infrastructure.Orders
                     SelectedFlowerColor = i.SelectedFlowerColor,
                     HasLights = i.HasLights,
                     HasButterfly = i.HasButterfly,
+                    Accessories = AccessoryCatalog.ForItem(i),
                     HasPhraseCard = i.HasPhraseCard,
                     PhraseText = i.PhraseText,
                     PhraseFont = i.PhraseFont,

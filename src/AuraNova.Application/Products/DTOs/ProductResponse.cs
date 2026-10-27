@@ -29,6 +29,8 @@ namespace AuraNova.Application.Products.DTOs
         public bool AllowsLights { get; set; } = false;
         public bool AllowsButterfly { get; set; } = false;
         public bool AllowsPhraseCard { get; set; } = false;
+        /// <summary>Claves de los accesorios que ofrece (los precios están en las opciones de personalización).</summary>
+        public List<string> AvailableAccessories { get; set; } = new List<string>();
         /// <summary>Cuántos colores y tipos de flor puede elegir el cliente (1 = flor por unidad).</summary>
         public int? MaxChoices { get; set; }
         

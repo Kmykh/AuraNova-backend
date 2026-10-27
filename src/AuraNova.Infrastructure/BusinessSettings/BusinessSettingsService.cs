@@ -218,14 +218,49 @@ namespace AuraNova.Infrastructure.BusinessSettings
             var settings = await GetOrCreateSettingsAsync();
             settings.ColorPalette = colors;
             settings.FlowerTypeOptions = flowers;
+            // Sin la lista (editor anterior) los accesorios quedan como estaban
+            if (request.Accessories != null)
+                settings.AccessoryOptions = CleanAccessories(request.Accessories);
             settings.UpdatedAt = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync();
 
             return MapOptions(settings);
         }
 
+        /// <summary>Accesorios válidos: nombre corto, precio entre 0 y 1000 y una clave fija por accesorio.</summary>
+        private static List<AccessoryOption> CleanAccessories(List<AccessoryOptionDto> request)
+        {
+            var result = new List<AccessoryOption>();
+            foreach (var item in request)
+            {
+                var name = item.Name?.Trim() ?? string.Empty;
+                if (name.Length == 0)
+                    continue;
+                if (name.Length > MaxOptionLength)
+                    throw new ArgumentException($"El accesorio '{name}' supera los {MaxOptionLength} caracteres.");
+                if (item.Price < 0 || item.Price > AuraNova.Infrastructure.Orders.AccessoryCatalog.MaxPrice)
+                    throw new ArgumentException($"El precio de '{name}' debe estar entre S/ 0 y S/ {AuraNova.Infrastructure.Orders.AccessoryCatalog.MaxPrice:0}.");
+
+                // La clave se conserva al renombrar: es lo que tienen guardado los productos
+                var key = AuraNova.Infrastructure.Orders.AccessoryCatalog.Slug(string.IsNullOrWhiteSpace(item.Key) ? name : item.Key);
+                if (key.Length == 0)
+                    throw new ArgumentException($"El nombre del accesorio '{name}' no es válido.");
+                if (result.Any(a => a.Key == key || string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase)))
+                    throw new ArgumentException($"El accesorio '{name}' está repetido.");
+
+                result.Add(new AccessoryOption { Key = key, Name = name, Price = Math.Round(item.Price, 2), Active = item.Active });
+            }
+
+            if (result.Count > AuraNova.Infrastructure.Orders.AccessoryCatalog.MaxAccessories)
+                throw new ArgumentException($"Puedes tener hasta {AuraNova.Infrastructure.Orders.AccessoryCatalog.MaxAccessories} accesorios.");
+            return result;
+        }
+
         private static CustomizationOptionsDto MapOptions(AuraNova.Domain.Entities.BusinessSettings settings) => new()
         {
+            Accessories = AuraNova.Infrastructure.Orders.AccessoryCatalog.Effective(settings.AccessoryOptions)
+                .Select(a => new AccessoryOptionDto { Key = a.Key, Name = a.Name, Price = a.Price, Active = a.Active })
+                .ToList(),
             Colors = settings.ColorPalette is { Count: > 0 }
                 ? settings.ColorPalette.Select(c => new ColorOptionDto { Name = c.Name, Hex = c.Hex }).ToList()
                 : DefaultColors.Select(c => new ColorOptionDto { Name = c.Name, Hex = c.Hex }).ToList(),
