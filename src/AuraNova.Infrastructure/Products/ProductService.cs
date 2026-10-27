@@ -52,6 +52,7 @@ namespace AuraNova.Infrastructure.Products
                 AllowsLights = request.AllowsLights,
                 AllowsButterfly = request.AllowsButterfly,
                 AllowsPhraseCard = request.AllowsPhraseCard,
+                MaxChoices = request.MaxChoices,
                 CategoryId = request.CategoryId,
                 Audience = request.Audience
             };
@@ -115,6 +116,7 @@ namespace AuraNova.Infrastructure.Products
             product.AllowsLights = request.AllowsLights;
             product.AllowsButterfly = request.AllowsButterfly;
             product.AllowsPhraseCard = request.AllowsPhraseCard;
+            product.MaxChoices = request.MaxChoices;
             product.CategoryId = request.CategoryId;
             product.Audience = request.Audience;
             product.UpdatedAt = DateTimeOffset.UtcNow;
@@ -323,6 +325,7 @@ namespace AuraNova.Infrastructure.Products
                 AllowsLights = product.AllowsLights,
                 AllowsButterfly = product.AllowsButterfly,
                 AllowsPhraseCard = product.AllowsPhraseCard,
+                MaxChoices = product.MaxChoices,
                 Audience = product.Audience,
                 Category = product.Category != null
                     ? new CategoryResponse

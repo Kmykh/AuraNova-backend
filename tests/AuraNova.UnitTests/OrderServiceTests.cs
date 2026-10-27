@@ -535,6 +535,34 @@ namespace AuraNova.UnitTests
             Assert.Equal(5, (await db.Products.FindAsync(product.Id))!.Stock);
         }
 
+        [Theory]
+        [InlineData(new[] { "Rosado", "Lila" }, new[] { "Rosas" })]
+        [InlineData(new[] { "Surtido multicolor" }, new[] { "Rosas" })]
+        [InlineData(new[] { "Rosado" }, new[] { "Rosas", "Tulipanes" })]
+        public async Task CreateAsync_SingleFlower_AcceptsOnlyOneColorAndFlower(string[] colors, string[] flowers)
+        {
+            using var db = GetInMemoryDb();
+            var product = await SeedProduct(db, stock: 10);
+            product.AvailableColors = ["Rosado", "Lila", "Amarillo"];
+            product.AvailableFlowerTypes = ["Rosas", "Tulipanes"];
+            product.MaxChoices = 1;
+            await db.SaveChangesAsync();
+            var zone = await SeedDeliveryZone(db);
+            var service = BuildService(db);
+            CreateOrderRequest Order(List<string> c, List<string> f) => new()
+            {
+                Customer = new CreateOrderCustomerRequest { Name = "María", Phone = "999999999" },
+                Items = [new() { ProductId = product.Id, Quantity = 1, SelectedColors = c, SelectedFlowerTypes = f }],
+                Delivery = new CreateOrderDeliveryRequest { Type = "Delivery", DeliveryZoneId = zone.Id, DeliveryAddress = "test" }
+            };
+
+            var ex = await Assert.ThrowsAsync<OrderValidationException>(() => service.CreateAsync(Order([.. colors], [.. flowers])));
+            Assert.Contains("una sola flor", ex.Message);
+
+            var ok = await service.CreateAsync(Order(["Lila"], ["Tulipanes"]));
+            Assert.Equal(["Lila"], ok.Items[0].SelectedColors);
+        }
+
         [Fact]
         public async Task CreateAsync_SameProductRepeated_ShouldValidateStockWithTotalQuantity()
         {

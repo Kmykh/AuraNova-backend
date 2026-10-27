@@ -54,6 +54,17 @@ namespace AuraNova.Infrastructure.Orders
             var resolvedColors = MatchAvailable(colors, product.AvailableColors, product.Name, "color", allowMixed: true);
             var resolvedFlowers = MatchAvailable(flowers, product.AvailableFlowerTypes, product.Name, "tipo de flor", allowMixed: false);
 
+            // Flor por unidad (o con pocas flores): no se eligen más colores ni tipos de flor que los que lleva
+            if (product.MaxChoices is int limit)
+            {
+                var tooMany = resolvedColors.Count > limit || resolvedFlowers.Count > limit ||
+                              (limit == 1 && resolvedColors.Contains(MixedColors));
+                if (tooMany)
+                    throw new OrderValidationException(limit == 1
+                        ? $"'{product.Name}' es una sola flor: elige un solo color. Quítala del carrito y vuelve a agregarla."
+                        : $"Para '{product.Name}' puedes elegir hasta {limit} colores y {limit} tipos de flor.");
+            }
+
             var hasPhraseCard = item.HasPhraseCard && product.AllowsPhraseCard;
             var phrase = hasPhraseCard ? item.PhraseText?.Trim() : null;
             if (phrase is { Length: > MaxPhraseLength })
