@@ -82,7 +82,11 @@ namespace AuraNova.Infrastructure.Payments
     }
 
     /// <summary>Error al comunicarse con Mercado Pago (credenciales, datos inválidos, servicio caído).</summary>
-    public class MercadoPagoGatewayException(string message, Exception? inner = null) : Exception(message, inner);
+    /// <param name="detail">Motivo técnico de Mercado Pago (código y mensaje) para el panel; al cliente se le muestra el mensaje.</param>
+    public class MercadoPagoGatewayException(string message, Exception? inner = null, string? detail = null) : Exception(message, inner)
+    {
+        public string? Detail { get; } = detail;
+    }
 
     public interface IMercadoPagoGateway
     {
@@ -193,9 +197,9 @@ namespace AuraNova.Infrastructure.Payments
                 if (parsed?.Id != null)
                     return parsed;
 
-                logger.LogWarning("Mercado Pago rechazó la creación de la order ({Status}): {Error}",
-                    ex.StatusCode, ex.ApiError?.Message ?? ex.Message);
-                throw new MercadoPagoGatewayException(FriendlyApiError(ex), ex);
+                var detail = ErrorDetail(ex.StatusCode ?? 0, ex.ApiResponse?.Content, ex.ApiError?.Message ?? ex.Message);
+                logger.LogWarning("Mercado Pago rechazó la creación de la order: {Detail}", detail);
+                throw new MercadoPagoGatewayException(FriendlyApiError(ex), ex, detail);
             }
             catch (MercadoPagoException ex)
             {
@@ -357,6 +361,31 @@ namespace AuraNova.Infrastructure.Payments
 
         private static decimal ParseAmount(string? value) =>
             decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) ? amount : 0m;
+
+        /// <summary>
+        /// "Mercado Pago 400: invalid_token · El token no existe": los códigos y mensajes que devolvió la API
+        /// (formato "errors" de Orders o "message" de las demás), para saber por qué no se creó el pago.
+        /// </summary>
+        public static string ErrorDetail(int statusCode, string? content, string fallback)
+        {
+            var parts = new List<string>();
+            try
+            {
+                var root = JObject.Parse(string.IsNullOrWhiteSpace(content) ? "{}" : content);
+                foreach (var error in (root["errors"] as JArray ?? []).OfType<JObject>())
+                {
+                    var text = string.Join(": ", new[] { (string?)error["code"], (string?)error["message"] }.Where(v => !string.IsNullOrWhiteSpace(v)));
+                    if (text.Length > 0) parts.Add(text);
+                }
+                if (parts.Count == 0 && ((string?)root["message"] ?? (string?)root["error"]) is { Length: > 0 } message)
+                    parts.Add(message);
+            }
+            catch (Newtonsoft.Json.JsonException)
+            {
+                // La respuesta no era JSON: queda el mensaje del SDK
+            }
+            return $"Mercado Pago {statusCode}: {(parts.Count > 0 ? string.Join(" · ", parts) : fallback)}";
+        }
 
         private static string FriendlyApiError(MercadoPagoApiException ex) => ex.StatusCode switch
         {

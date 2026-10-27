@@ -138,7 +138,8 @@ namespace AuraNova.Infrastructure.Payments
             catch (MercadoPagoGatewayException ex)
             {
                 transaction.Status = "error";
-                transaction.StatusDetail = Truncate(ex.Message, 100);
+                // En el panel queda el motivo real de Mercado Pago; al cliente, el mensaje amable
+                transaction.StatusDetail = Truncate(ex.Detail ?? ex.Message, 100);
                 transaction.UpdatedAt = DateTimeOffset.UtcNow;
                 await db.SaveChangesAsync(cancellationToken);
                 throw new OnlinePaymentException(ex.Message);

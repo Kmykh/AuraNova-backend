@@ -527,6 +527,15 @@ namespace AuraNova.UnitTests
             Assert.Empty(gateway.Created);
         }
 
+        [Theory]
+        [InlineData("{\"errors\":[{\"code\":\"invalid_token\",\"message\":\"Token not found\"}]}", "Mercado Pago 400: invalid_token: Token not found")]
+        [InlineData("{\"message\":\"Invalid users involved\",\"error\":\"bad_request\"}", "Mercado Pago 400: Invalid users involved")]
+        [InlineData("no es json", "Mercado Pago 400: Bad Request")]
+        public void GatewayErrorDetail_KeepsTheRealReason(string content, string expected)
+        {
+            Assert.Equal(expected, MercadoPagoGateway.ErrorDetail(400, content, "Bad Request"));
+        }
+
         [Fact]
         public void WebhookSignature_UsesOfficialManifest()
         {
