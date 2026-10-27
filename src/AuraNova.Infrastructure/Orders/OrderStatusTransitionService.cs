@@ -6,7 +6,8 @@ namespace AuraNova.Infrastructure.Orders
 {
     public class OrderStatusTransitionService : IOrderStatusTransitionService
     {
-        // States from which cancellation is allowed
+        // Se puede cancelar hasta antes de entregarlo (listo o en camino incluidos: el cliente desiste o no se pudo entregar).
+        // Ya en la agencia o entregado, no.
         private static readonly HashSet<OrderStatus> CancellableStates =
         [
             OrderStatus.WaitingQuote,
@@ -14,7 +15,9 @@ namespace AuraNova.Infrastructure.Orders
             OrderStatus.WaitingPayment,
             OrderStatus.PaymentReported,
             OrderStatus.PaymentConfirmed,
-            OrderStatus.Preparing
+            OrderStatus.Preparing,
+            OrderStatus.Ready,
+            OrderStatus.Shipped
         ];
 
         // Forward transitions for MeetingPoint

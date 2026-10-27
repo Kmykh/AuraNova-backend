@@ -64,7 +64,8 @@ namespace AuraNova.API.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            if (!Enum.TryParse<OrderStatus>(request.Status, ignoreCase: true, out var newStatus))
+            // TryParse acepta cualquier número ("99"): solo vale si es un estado que existe
+            if (!Enum.TryParse<OrderStatus>(request.Status, ignoreCase: true, out var newStatus) || !Enum.IsDefined(newStatus))
                 return BadRequest(new { message = $"Estado inválido: '{request.Status}'." });
 
             try
