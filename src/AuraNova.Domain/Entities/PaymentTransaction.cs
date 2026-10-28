@@ -32,6 +32,12 @@ namespace AuraNova.Domain.Entities
         public string Status { get; set; } = "created";
         public string? StatusDetail { get; set; }
 
+        /// <summary>
+        /// Clave de idempotencia enviada a Mercado Pago (pedido + token). Si el cliente vuelve a enviar el mismo
+        /// token (p. ej. el mismo código de Yape), así se encuentra el envío original.
+        /// </summary>
+        public string? IdempotencyKey { get; set; }
+
         /// <summary>Lo devuelto al cliente desde el panel (total o parcial). Se descuenta de lo pagado.</summary>
         public decimal RefundedAmount { get; set; }
 

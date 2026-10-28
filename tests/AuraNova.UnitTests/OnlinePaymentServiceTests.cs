@@ -25,9 +25,14 @@ namespace AuraNova.UnitTests
             /// <summary>Mercado Pago creó (y cobró) la order aunque respondió con error.</summary>
             public bool ChargedDespiteError { get; set; }
             public Dictionary<string, GatewayOrder> Orders { get; } = new();
+            /// <summary>Como Mercado Pago: la misma clave con otro contenido responde 409 idempotency_key_already_used.</summary>
+            public bool RejectRepeatedKeys { get; set; }
+            private readonly HashSet<string> _usedKeys = new();
 
             public Task<GatewayOrder> CreateOrderAsync(GatewayCreateOrder request, CancellationToken cancellationToken = default)
             {
+                if (RejectRepeatedKeys && !_usedKeys.Add(request.IdempotencyKey))
+                    throw new MercadoPagoDuplicateRequestException("Mercado Pago 409: idempotency_key_already_used: X-Idempotency-Key already used.");
                 Created.Add(request);
                 if (CreateError != null)
                 {
@@ -177,6 +182,73 @@ namespace AuraNova.UnitTests
 
             Assert.Equal("pending", result.Status);
             Assert.Empty(gateway.Created);
+        }
+
+        private static CreateOnlinePaymentRequest Yape(bool payFull, string token) => new()
+        {
+            Method = "yape",
+            Token = token,
+            Phone = "963153038",
+            PayFull = payFull,
+            PayerEmail = "pagador@example.com"
+        };
+
+        [Fact]
+        public async Task SameYapeCode_AfterApprovedDeposit_IsNotARejection_AndAsksForANewCode()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 7.80m);
+            var (service, gateway, _) = Build(db);
+            gateway.RejectRepeatedKeys = true;
+
+            var deposit = await service.PayAsync(order.Id, Yape(payFull: false, token: "yape-mismo-codigo"));
+            Assert.Equal("approved", deposit.Status);
+
+            // El cliente vuelve a tocar "Yapear" con el mismo código para pagar el saldo
+            var ex = await Assert.ThrowsAsync<OnlinePaymentException>(() => service.PayAsync(order.Id, Yape(payFull: false, token: "yape-mismo-codigo")));
+
+            Assert.Contains("ya se usó en tu pago de S/ 3.90, que sí se aprobó", ex.Message);
+            Assert.Contains("genera un código nuevo", ex.Message);
+            // No queda un "rechazado" falso en el panel: solo el cobro aprobado
+            var transaction = Assert.Single(await db.PaymentTransactions.ToListAsync());
+            Assert.NotNull(transaction.ApprovedAt);
+            Assert.Equal(3.90m, (await db.Payments.SingleAsync()).AmountPaid);
+        }
+
+        [Fact]
+        public async Task SameYapeCode_WhenTheFirstSendLookedFailed_ButWasCharged_IsConfirmedAsApproved()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 50m);
+            var (service, gateway, _) = Build(db);
+            gateway.RejectRepeatedKeys = true;
+            gateway.CreateError = new MercadoPagoGatewayException("No pudimos procesar el pago.", detail: "Mercado Pago 400: algo raro");
+            gateway.ChargedDespiteError = true;
+            await Assert.ThrowsAsync<OnlinePaymentException>(() => service.PayAsync(order.Id, Yape(payFull: true, token: "yape-tok")));
+
+            gateway.CreateError = null;
+            var result = await service.PayAsync(order.Id, Yape(payFull: true, token: "yape-tok"));
+
+            Assert.Equal("approved", result.Status);
+            Assert.Equal(50m, result.AmountPaid);
+            Assert.Equal(OrderStatus.PaymentConfirmed, (await db.Orders.FindAsync(order.Id))!.Status);
+            Assert.Single(await db.PaymentTransactions.ToListAsync());
+        }
+
+        [Fact]
+        public async Task SameYapeCode_AfterARejectedPayment_AsksForANewCode()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 50m);
+            var (service, gateway, _) = Build(db);
+            gateway.RejectRepeatedKeys = true;
+            gateway.OnCreate = FakeGateway.Failed;
+            Assert.Equal("rejected", (await service.PayAsync(order.Id, Yape(payFull: true, token: "yape-tok"))).Status);
+
+            var ex = await Assert.ThrowsAsync<OnlinePaymentException>(() => service.PayAsync(order.Id, Yape(payFull: true, token: "yape-tok")));
+
+            Assert.Contains("Ese código de aprobación ya se usó", ex.Message);
+            Assert.Single(await db.PaymentTransactions.ToListAsync());
         }
 
         [Fact]

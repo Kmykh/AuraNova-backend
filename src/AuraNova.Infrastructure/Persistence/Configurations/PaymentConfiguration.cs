@@ -51,6 +51,7 @@ namespace AuraNova.Infrastructure.Persistence.Configurations
             builder.Property(t => t.Amount).HasPrecision(18, 2).IsRequired();
             builder.Property(t => t.Status).IsRequired().HasMaxLength(40);
             builder.Property(t => t.StatusDetail).HasMaxLength(100);
+            builder.Property(t => t.IdempotencyKey).HasMaxLength(64);
             builder.Property(t => t.RefundedAmount).HasPrecision(18, 2).HasDefaultValue(0m);
             builder.Property(t => t.CreatedAt).IsRequired();
 

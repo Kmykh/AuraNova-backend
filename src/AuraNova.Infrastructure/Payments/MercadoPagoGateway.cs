@@ -95,6 +95,13 @@ namespace AuraNova.Infrastructure.Payments
     public class MercadoPagoInProgressException(string detail, Exception? inner = null)
         : MercadoPagoGatewayException("Tu pago se está procesando.", inner, detail);
 
+    /// <summary>
+    /// 409 idempotency_key_already_used: Mercado Pago ya recibió este mismo token para este pedido
+    /// (el cliente volvió a escribir el mismo código de Yape). No cobró otra vez: no es un rechazo.
+    /// </summary>
+    public class MercadoPagoDuplicateRequestException(string detail, Exception? inner = null)
+        : MercadoPagoGatewayException("Este pago ya se envió.", inner, detail);
+
     public interface IMercadoPagoGateway
     {
         Task<GatewayOrder> CreateOrderAsync(GatewayCreateOrder request, CancellationToken cancellationToken = default);
@@ -211,6 +218,11 @@ namespace AuraNova.Infrastructure.Payments
                 {
                     logger.LogWarning("Mercado Pago aún procesa un envío anterior del mismo pago: {Detail}", detail);
                     throw new MercadoPagoInProgressException(detail, ex);
+                }
+                if (ex.StatusCode == 409 && detail.Contains("idempotency_key_already_used", StringComparison.OrdinalIgnoreCase))
+                {
+                    logger.LogInformation("Mercado Pago ya había recibido este mismo token: {Detail}", detail);
+                    throw new MercadoPagoDuplicateRequestException(detail, ex);
                 }
                 logger.LogWarning("Mercado Pago rechazó la creación de la order: {Detail}", detail);
                 throw new MercadoPagoGatewayException(FriendlyApiError(ex), ex, detail);
