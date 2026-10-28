@@ -153,6 +153,7 @@ namespace AuraNova.Infrastructure.Orders
                         throw new OrderValidationException("El campo Province es obligatorio para envío nacional.");
                     if (string.IsNullOrWhiteSpace(request.Delivery.District))
                         throw new OrderValidationException("El campo District es obligatorio para envío nacional.");
+                    RequireAgencyBranch(request.Delivery);
 
                     deliveryCost = null; // Costo asumido por el cliente en destino
                     initialStatus = OrderStatus.WaitingPayment;
@@ -372,6 +373,16 @@ namespace AuraNova.Infrastructure.Orders
         }
 
         /// <summary>
+        /// En un distrito puede haber varias sucursales de Shalom u Olva: hace falta saber a cuál enviar
+        /// (o que el cliente pidió que elijamos la más cercana; ese texto también llega aquí).
+        /// </summary>
+        private static void RequireAgencyBranch(CreateOrderDeliveryRequest delivery)
+        {
+            if (string.IsNullOrWhiteSpace(delivery.DeliveryAddress) || delivery.DeliveryAddress.Trim().Length < 3)
+                throw new OrderValidationException("Indica la sucursal de la agencia a la que enviamos tu pedido, o marca que no la sabes.");
+        }
+
+        /// <summary>
         /// Generates a unique, human-readable order code in format PED-YYYY-NNNNNN.
         /// Uses the max existing sequence number for the current year to avoid gaps/collisions.
         /// </summary>
@@ -463,6 +474,7 @@ namespace AuraNova.Infrastructure.Orders
                         meetingPointName = meetingPoint.Name;
                         break;
                     case DeliveryType.NationalShipping:
+                        RequireAgencyBranch(request.Delivery);
                         deliveryCost = null;
                         break;
                 }

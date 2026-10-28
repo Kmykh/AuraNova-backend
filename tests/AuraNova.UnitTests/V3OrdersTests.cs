@@ -27,9 +27,20 @@ namespace AuraNova.UnitTests
         private static CreateCustomOrderRequest CustomRequest() => new()
         {
             Customer = new CreateOrderCustomerRequest { Name = "Ana Torres", Phone = "987654321" },
-            Delivery = new CreateOrderDeliveryRequest { Type = "NationalShipping", Department = "Junín", Province = "Huancayo", District = "El Tambo" },
+            Delivery = new CreateOrderDeliveryRequest { Type = "NationalShipping", Department = "Junín", Province = "Huancayo", District = "El Tambo", DeliveryAddress = "Shalom Av. Huancavelica" },
             CustomizationNotes = "Ramo en tonos lila con mariposas"
         };
+
+        [Fact]
+        public async Task CustomOrder_NationalShipping_WithoutBranch_AsksForIt()
+        {
+            using var db = GetInMemoryDb();
+            var request = CustomRequest();
+            request.Delivery.DeliveryAddress = "  ";
+
+            var ex = await Assert.ThrowsAsync<OrderValidationException>(() => CreateOrderService(db).CreateCustomAsync(request));
+            Assert.Contains("sucursal", ex.Message);
+        }
 
         // ---------- Códigos ----------
 
