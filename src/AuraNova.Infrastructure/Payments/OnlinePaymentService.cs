@@ -106,6 +106,12 @@ namespace AuraNova.Infrastructure.Payments
 
             // Por pedido y token: un doble envío no cobra dos veces y otro pedido nunca comparte la clave
             var idempotencyKey = MercadoPagoGateway.IdempotencyKeyFor($"{order.Id:N}:{request.Token.Trim()}");
+
+            // Este mismo token ya se envió (p. ej. el mismo código de Yape tras pagar el adelanto):
+            // se responde con lo que pasó en ese envío sin mandarle a Mercado Pago un segundo pago
+            if (payment.Transactions?.Any(t => t.IdempotencyKey == idempotencyKey) == true)
+                return await RepeatedTokenAsync(order, payment, methodId, idempotencyKey, cancellationToken);
+
             var transaction = new PaymentTransaction
             {
                 PaymentId = payment.Id,
@@ -153,7 +159,7 @@ namespace AuraNova.Infrastructure.Payments
                 // Este intento no existe para Mercado Pago, así que no se guarda como rechazo.
                 db.PaymentTransactions.Remove(transaction);
                 await db.SaveChangesAsync(cancellationToken);
-                return await RepeatedTokenAsync(order, payment, transaction, cancellationToken);
+                return await RepeatedTokenAsync(order, payment, methodId, idempotencyKey, cancellationToken);
             }
             catch (MercadoPagoInProgressException ex)
             {
@@ -692,11 +698,11 @@ namespace AuraNova.Infrastructure.Payments
         /// El cliente envió un token que ya se usó en este pedido. Se responde con lo que pasó en ese envío:
         /// si aún no se sabe, se consulta a Mercado Pago; si se aprobó, se le pide un código nuevo para lo que falta.
         /// </summary>
-        private async Task<OnlinePaymentResult> RepeatedTokenAsync(Order order, Payment payment, PaymentTransaction attempt, CancellationToken cancellationToken)
+        private async Task<OnlinePaymentResult> RepeatedTokenAsync(Order order, Payment payment, string methodId, string idempotencyKey, CancellationToken cancellationToken)
         {
-            var isYape = attempt.MethodId == "yape";
+            var isYape = methodId == "yape";
             var original = await db.PaymentTransactions
-                .Where(t => t.OrderId == order.Id && t.IdempotencyKey == attempt.IdempotencyKey && t.Id != attempt.Id)
+                .Where(t => t.OrderId == order.Id && t.IdempotencyKey == idempotencyKey)
                 .OrderByDescending(t => t.CreatedAt)
                 .FirstOrDefaultAsync(cancellationToken);
 

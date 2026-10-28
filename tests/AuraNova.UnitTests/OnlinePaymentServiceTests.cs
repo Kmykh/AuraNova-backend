@@ -209,6 +209,8 @@ namespace AuraNova.UnitTests
 
             Assert.Contains("ya se usó en tu pago de S/ 3.90, que sí se aprobó", ex.Message);
             Assert.Contains("genera un código nuevo", ex.Message);
+            // Se detecta aquí: a Mercado Pago no le llega un segundo pago
+            Assert.Single(gateway.Created);
             // No queda un "rechazado" falso en el panel: solo el cobro aprobado
             var transaction = Assert.Single(await db.PaymentTransactions.ToListAsync());
             Assert.NotNull(transaction.ApprovedAt);
@@ -233,6 +235,7 @@ namespace AuraNova.UnitTests
             Assert.Equal(50m, result.AmountPaid);
             Assert.Equal(OrderStatus.PaymentConfirmed, (await db.Orders.FindAsync(order.Id))!.Status);
             Assert.Single(await db.PaymentTransactions.ToListAsync());
+            Assert.Single(gateway.Created);
         }
 
         [Fact]
@@ -246,6 +249,24 @@ namespace AuraNova.UnitTests
             Assert.Equal("rejected", (await service.PayAsync(order.Id, Yape(payFull: true, token: "yape-tok"))).Status);
 
             var ex = await Assert.ThrowsAsync<OnlinePaymentException>(() => service.PayAsync(order.Id, Yape(payFull: true, token: "yape-tok")));
+
+            Assert.Contains("Ese código de aprobación ya se usó", ex.Message);
+            Assert.Single(await db.PaymentTransactions.ToListAsync());
+        }
+
+        [Fact]
+        public async Task RepeatedToken_FromAPaymentSavedBeforeTheKeyExisted_IsHandledFromMercadoPago409()
+        {
+            using var db = GetDb();
+            var order = await SeedOrder(db, total: 7.80m);
+            var (service, gateway, _) = Build(db);
+            gateway.RejectRepeatedKeys = true;
+            await service.PayAsync(order.Id, Yape(payFull: false, token: "yape-viejo"));
+            // Cobro guardado antes de esta versión: sin clave
+            (await db.PaymentTransactions.SingleAsync()).IdempotencyKey = null;
+            await db.SaveChangesAsync();
+
+            var ex = await Assert.ThrowsAsync<OnlinePaymentException>(() => service.PayAsync(order.Id, Yape(payFull: false, token: "yape-viejo")));
 
             Assert.Contains("Ese código de aprobación ya se usó", ex.Message);
             Assert.Single(await db.PaymentTransactions.ToListAsync());
@@ -607,12 +628,13 @@ namespace AuraNova.UnitTests
 
             await service.PayAsync(order.Id, Card(payFull: false, token: "same-token"));
 
-            // Mismo token = misma clave de idempotencia = misma order en Mercado Pago
+            // Mismo token = misma clave: se reconoce aquí y no se le envía a Mercado Pago un segundo pago
             order.Status = OrderStatus.WaitingPayment;
             await db.SaveChangesAsync();
-            await service.PayAsync(order.Id, Card(payFull: false, token: "same-token"));
+            var ex = await Assert.ThrowsAsync<OnlinePaymentException>(() => service.PayAsync(order.Id, Card(payFull: false, token: "same-token")));
 
-            Assert.Equal(gateway.Created[0].IdempotencyKey, gateway.Created[1].IdempotencyKey);
+            Assert.Contains("ya se usaron en un pago aprobado", ex.Message);
+            Assert.Single(gateway.Created);
             Assert.Single(db.PaymentTransactions);
             Assert.Equal(50m, (await db.Payments.SingleAsync()).AmountPaid);
         }
