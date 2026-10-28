@@ -104,6 +104,8 @@ namespace AuraNova.Infrastructure.Payments
             var (firstName, lastName) = MercadoPagoOrderData.SplitName(order.Customer?.Name);
             var history = order.Customer == null ? null : await BuyerHistoryAsync(order, cancellationToken);
 
+            // Por pedido y token: un doble envío no cobra dos veces y otro pedido nunca comparte la clave
+            var idempotencyKey = MercadoPagoGateway.IdempotencyKeyFor($"{order.Id:N}:{request.Token.Trim()}");
             var transaction = new PaymentTransaction
             {
                 PaymentId = payment.Id,
@@ -112,7 +114,8 @@ namespace AuraNova.Infrastructure.Payments
                 MethodType = methodType,
                 Amount = amount,
                 IsDeposit = isDeposit,
-                Status = "created"
+                Status = "created",
+                IdempotencyKey = idempotencyKey
             };
             db.PaymentTransactions.Add(transaction);
             await db.SaveChangesAsync(cancellationToken);
@@ -135,8 +138,7 @@ namespace AuraNova.Infrastructure.Payments
                     PaymentMethodType: methodType,
                     Token: request.Token.Trim(),
                     Installments: request.Installments,
-                    // Por pedido y token: un doble envío no cobra dos veces y otro pedido nunca comparte la clave
-                    IdempotencyKey: MercadoPagoGateway.IdempotencyKeyFor($"{order.Id:N}:{request.Token.Trim()}"),
+                    IdempotencyKey: idempotencyKey,
                     PayerFirstName: firstName,
                     PayerLastName: lastName,
                     PayerAddress: MercadoPagoOrderData.PayerAddress(order),
@@ -144,6 +146,14 @@ namespace AuraNova.Infrastructure.Payments
                     ShipmentAddress: MercadoPagoOrderData.ShipmentAddress(order),
                     History: history,
                     DeviceId: request.DeviceId?.Trim()), cancellationToken);
+            }
+            catch (MercadoPagoDuplicateRequestException)
+            {
+                // Mismo token ya enviado (mismo código de Yape escrito otra vez): Mercado Pago no cobró de nuevo.
+                // Este intento no existe para Mercado Pago, así que no se guarda como rechazo.
+                db.PaymentTransactions.Remove(transaction);
+                await db.SaveChangesAsync(cancellationToken);
+                return await RepeatedTokenAsync(order, payment, transaction, cancellationToken);
             }
             catch (MercadoPagoInProgressException ex)
             {
@@ -678,6 +688,59 @@ namespace AuraNova.Infrastructure.Payments
         };
 
         /// <summary>Consulta hasta 3 veces (a los 2, 3 y 4 s) si Mercado Pago creó la order de este intento.</summary>
+        /// <summary>
+        /// El cliente envió un token que ya se usó en este pedido. Se responde con lo que pasó en ese envío:
+        /// si aún no se sabe, se consulta a Mercado Pago; si se aprobó, se le pide un código nuevo para lo que falta.
+        /// </summary>
+        private async Task<OnlinePaymentResult> RepeatedTokenAsync(Order order, Payment payment, PaymentTransaction attempt, CancellationToken cancellationToken)
+        {
+            var isYape = attempt.MethodId == "yape";
+            var original = await db.PaymentTransactions
+                .Where(t => t.OrderId == order.Id && t.IdempotencyKey == attempt.IdempotencyKey && t.Id != attempt.Id)
+                .OrderByDescending(t => t.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (original is { ApprovedAt: null } && (UnresolvedStatuses.Contains(original.Status) || original.Status == "error"))
+            {
+                var found = original.ExternalOrderId != null
+                    ? await gateway.GetOrderAsync(original.ExternalOrderId, cancellationToken)
+                    : await FindSoonAsync(original, cancellationToken);
+                if (found != null)
+                    await ApplyAsync(order, payment, original, found, cancellationToken);
+                // Ese envío sí se cobró (el cliente no se enteró): se le confirma ahora
+                if (original.ApprovedAt != null)
+                {
+                    var paidNow = Math.Min(await NetPaidAsync(payment.Id, cancellationToken), payment.Amount);
+                    return new OnlinePaymentResult
+                    {
+                        Status = "approved",
+                        Message = paidNow < payment.Amount
+                            ? $"¡Pago recibido! Pagaste el adelanto. Te falta {Money(payment.Amount - paidNow)}, que puedes pagar aquí mismo cuando quieras."
+                            : "¡Pago recibido! Tu pedido está pagado.",
+                        AmountCharged = original.Amount,
+                        AmountPaid = paidNow,
+                        BalanceDue = payment.Amount - paidNow,
+                        OrderStatus = order.Status.ToString()
+                    };
+                }
+                if (found is not { IsFailed: true })
+                    return InProgress(order, payment, original.Amount);
+            }
+
+            if (original?.ApprovedAt != null)
+            {
+                var paid = Math.Min(await NetPaidAsync(payment.Id, cancellationToken), payment.Amount);
+                throw new OnlinePaymentException(isYape
+                    ? $"Ese código de Yape ya se usó en tu pago de {Money(original.Amount)}, que sí se aprobó. " +
+                      (paid < payment.Amount ? $"Para pagar lo que falta ({Money(payment.Amount - paid)}), genera un código nuevo en tu app Yape." : "Tu pedido ya está pagado.")
+                    : "Esos datos de tarjeta ya se usaron en un pago aprobado. Vuelve a ingresarlos para pagar lo que falta.");
+            }
+
+            throw new OnlinePaymentException(isYape
+                ? "Ese código de aprobación ya se usó. Genera uno nuevo en tu app Yape e inténtalo otra vez."
+                : "Esos datos de tarjeta ya se usaron. Vuelve a ingresarlos e inténtalo otra vez.");
+        }
+
         private async Task<GatewayOrder?> FindSoonAsync(PaymentTransaction transaction, CancellationToken cancellationToken)
         {
             var step = verifyDelay ?? TimeSpan.FromSeconds(1);
