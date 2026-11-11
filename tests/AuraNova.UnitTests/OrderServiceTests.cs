@@ -631,6 +631,63 @@ namespace AuraNova.UnitTests
             Assert.Equal(["luces"], item.Accessories.Select(a => a.Key));
         }
 
+        // =====================================================================
+        // COMPRAS DESDE OTRO PAÍS
+        // =====================================================================
+
+        [Theory]
+        [InlineData("987654321", "987654321")]
+        [InlineData("+51 987 654 321", "987654321")]
+        [InlineData("+54 9 11 2345-6789", "+5491123456789")]
+        [InlineData("+34 612 345 678", "+34612345678")]
+        public async Task CreateAsync_SavesWhatsAppPeruvianOrWithCountryCode(string typed, string saved)
+        {
+            using var db = GetInMemoryDb();
+            var product = await SeedProduct(db);
+            var zone = await SeedDeliveryZone(db);
+            var request = BuildDeliveryRequest(product.Id, zone.Id, quantity: 1);
+            request.Customer.Phone = typed;
+
+            await BuildService(db).CreateAsync(request);
+
+            Assert.Equal(saved, (await db.Customers.SingleAsync()).Phone);
+        }
+
+        [Theory]
+        [InlineData("12345")]
+        [InlineData("812345678")]      // celular peruano que no empieza con 9
+        [InlineData("5491123456789")]  // de otro país pero sin el "+"
+        public async Task CreateAsync_RejectsWhatsAppThatIsNeitherPeruvianNorInternational(string typed)
+        {
+            using var db = GetInMemoryDb();
+            var product = await SeedProduct(db);
+            var zone = await SeedDeliveryZone(db);
+            var request = BuildDeliveryRequest(product.Id, zone.Id, quantity: 1);
+            request.Customer.Phone = typed;
+
+            var ex = await Assert.ThrowsAsync<OrderValidationException>(() => BuildService(db).CreateAsync(request));
+            Assert.Contains("código de país", ex.Message);
+        }
+
+        [Fact]
+        public async Task PaymentSummary_MarksBuyersFromAnotherCountry()
+        {
+            using var db = GetInMemoryDb();
+            var product = await SeedProduct(db);
+            var zone = await SeedDeliveryZone(db);
+            var abroad = BuildDeliveryRequest(product.Id, zone.Id, quantity: 1);
+            abroad.Customer.Phone = "+54 9 11 2345 6789";
+            var local = BuildDeliveryRequest(product.Id, zone.Id, quantity: 1);
+
+            var service = BuildService(db);
+            var fromArgentina = await service.CreateAsync(abroad);
+            var fromPeru = await service.CreateAsync(local);
+            var tracking = new OrderTrackingService(db, new TestStorage());
+
+            Assert.True((await tracking.GetPaymentSummaryAsync(fromArgentina.Id))!.InternationalBuyer);
+            Assert.False((await tracking.GetPaymentSummaryAsync(fromPeru.Id))!.InternationalBuyer);
+        }
+
         [Theory]
         [InlineData(new[] { "Rosado", "Lila" }, new[] { "Rosas" })]
         [InlineData(new[] { "Surtido multicolor" }, new[] { "Rosas" })]

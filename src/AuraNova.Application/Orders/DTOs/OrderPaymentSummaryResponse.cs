@@ -7,6 +7,8 @@ namespace AuraNova.Application.Orders.DTOs
     public class OrderPaymentSummaryResponse
     {
         public Guid OrderId { get; set; }
+        /// <summary>El cliente dejó un WhatsApp de otro país: paga con tarjeta (Yape es solo de Perú).</summary>
+        public bool InternationalBuyer { get; set; }
         public string OrderCode { get; set; } = null!;
         /// <summary>
         /// Código de seguimiento: quien tiene el enlace de pago (un GUID que solo recibe el cliente) ya lo recibió

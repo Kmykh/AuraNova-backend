@@ -67,7 +67,7 @@ namespace AuraNova.IntegrationTests
         private static string OrderJson(string? link = "https://pin.it/modelo") => JsonSerializer.Serialize(new
         {
             customer = new { name = "Ana Torres", phone = "987654321" },
-            delivery = new { type = "NationalShipping", department = "Junín", province = "Huancayo", district = "El Tambo" },
+            delivery = new { type = "NationalShipping", department = "Junín", province = "Huancayo", district = "El Tambo", deliveryAddress = "Shalom Av. Huancavelica" },
             customizationNotes = "Como la foto pero en tonos lila",
             referenceLinks = link == null ? Array.Empty<string>() : new[] { link },
             desiredDate = DateTime.UtcNow.AddDays(7).ToString("yyyy-MM-dd"),
