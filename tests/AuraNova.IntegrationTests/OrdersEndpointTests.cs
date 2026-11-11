@@ -134,7 +134,7 @@ namespace AuraNova.IntegrationTests
 
             var request = new CreateOrderRequest
             {
-                Customer = new CreateOrderCustomerRequest { Name = "Carlos", Phone = "888888888" },
+                Customer = new CreateOrderCustomerRequest { Name = "Carlos", Phone = "988888888" },
                 Items = [new() { ProductId = product.Id, Quantity = 1 }],
                 Delivery = new CreateOrderDeliveryRequest
                 {
@@ -175,6 +175,7 @@ namespace AuraNova.IntegrationTests
                     Department = "Lima",
                     Province = "Lima",
                     District = "Carabayllo",
+                    DeliveryAddress = "Shalom Av. Túpac Amaru",
                     PreferredAgency = "Shalom",
                     RecipientDocument = "12345678"
                 }

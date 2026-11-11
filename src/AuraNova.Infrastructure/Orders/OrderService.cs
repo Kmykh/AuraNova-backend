@@ -34,6 +34,9 @@ namespace AuraNova.Infrastructure.Orders
             if (request.Items.Count > 30)
                 throw new OrderValidationException("Un pedido puede tener hasta 30 productos. Para más unidades escríbenos por WhatsApp.");
 
+            // Celular peruano o, si compra desde otro país, con su código de país
+            var customerPhone = CustomerPhone.Normalize(request.Customer.Phone);
+
             // --- 2. El mismo producto puede venir varias veces con distinta personalización:
             //        stock y disponibilidad se validan con la cantidad total por producto ---
             var quantityByProduct = request.Items
@@ -189,7 +192,7 @@ namespace AuraNova.Infrastructure.Orders
                 var customer = new Customer
                 {
                     Name = request.Customer.Name.Trim(),
-                    Phone = request.Customer.Phone.Trim(),
+                    Phone = customerPhone,
                     Email = request.Customer.Email?.Trim()
                 };
                 _db.Customers.Add(customer);
@@ -391,6 +394,7 @@ namespace AuraNova.Infrastructure.Orders
             // --- 0. Brief validation (before opening the transaction) ---
             var referenceLinks = CustomOrderBrief.CleanLinks(request.ReferenceLinks);
             var recipient = RecipientDetails.From(request.Delivery);
+            var customerPhone = CustomerPhone.Normalize(request.Customer.Phone);
 
             // Peru (UTC-5): the customer can't ask for a date that already passed
             var todayInPeru = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-5));
@@ -413,13 +417,13 @@ namespace AuraNova.Infrastructure.Orders
             {
                 // --- 1. Identify or Create Customer ---
                 var customer = await _db.Customers
-                    .FirstOrDefaultAsync(c => c.Phone == request.Customer.Phone.Trim());
+                    .FirstOrDefaultAsync(c => c.Phone == customerPhone);
 
                 if (customer == null)
                 {
                     customer = new Customer
                     {
-                        Phone = request.Customer.Phone.Trim(),
+                        Phone = customerPhone,
                         Name = request.Customer.Name.Trim(),
                         Email = request.Customer.Email?.Trim()
                     };

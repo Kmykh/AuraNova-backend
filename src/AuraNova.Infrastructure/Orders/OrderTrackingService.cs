@@ -50,6 +50,7 @@ namespace AuraNova.Infrastructure.Orders
         {
             var order = await _db.Orders
                 .AsNoTracking()
+                .Include(o => o.Customer)
                 .Include(o => o.Items!).ThenInclude(i => i.Product)
                 .Include(o => o.Quote)
                 .Include(o => o.Payment)
@@ -64,6 +65,7 @@ namespace AuraNova.Infrastructure.Orders
             {
                 OrderId = order.Id,
                 OrderCode = order.OrderCode,
+                InternationalBuyer = CustomerPhone.IsAbroad(order.Customer?.Phone),
                 TrackingCode = order.TrackingToken,
                 Status = order.Status.ToString(),
                 StatusLabel = OrderStatusLabels.GetLabel(order.Status),
